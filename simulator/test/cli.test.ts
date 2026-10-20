@@ -18,3 +18,14 @@ it('builds a Node CLI with deterministic JSONL and summary artifacts', () => {
         rmSync(out, { recursive: true, force: true });
     }
 }, 30000);
+it('campaign CLI writes decisions, audit, notifications and timeline',()=>{
+ const out=mkdtempSync(join(tmpdir(),'sim-campaign-cli-'));
+ try{
+ execFileSync('npm',['run','build'],{stdio:'pipe'});
+ execFileSync(process.execPath,['dist/src/cli/sim.js','scenarios/golden-winner.json','--rules','campaign','--out',out],{stdio:'pipe'});
+ expect(readFileSync(join(out,'timeline.md'),'utf8')).toContain('R02');
+ expect(readFileSync(join(out,'decisions.jsonl'),'utf8')).toContain('R01');
+ expect(readFileSync(join(out,'audit.jsonl'),'utf8')).toContain('NOT_SCHEDULED');
+ expect(readFileSync(join(out,'notifications.jsonl'),'utf8')).toBe('');
+ }finally{rmSync(out,{recursive:true,force:true});}
+},30000);

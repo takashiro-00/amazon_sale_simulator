@@ -53,7 +53,13 @@ export interface EngineState {
     Record<string, Target>
   >;
 }
+export interface NotificationLog {
+ readonly at: string; readonly campaignId: string;
+ readonly type: "R06_PAUSED" | "R06B_PAUSED" | "R08_ALERT" | "PRODUCT_INFEASIBLE";
+ readonly details: Readonly<Record<string, unknown>>;
+}
 export interface Proposal {
+  readonly notifications?: readonly NotificationLog[];
   readonly proposedState: EngineState;
   readonly reasons?: readonly string[];
 }
@@ -67,6 +73,11 @@ export interface Decision {
   readonly paramsVersion: string;
 }
 export interface RuleContext {
+  readonly metrics: import("../data/metrics.js").MetricsReader;
+  readonly thresholdsByCampaign: Readonly<Record<string, DerivedThresholds>>;
+  readonly today: string;
+  readonly notify: (event: NotificationLog) => void;
+  readonly manualReenabledCampaignIds?: readonly string[];
   readonly runId: string;
   readonly clock: Clock;
   readonly config: SimConfig;

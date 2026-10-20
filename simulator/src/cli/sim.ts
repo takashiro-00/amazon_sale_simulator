@@ -1,3 +1,4 @@
+import { runCampaignLoop, timelineMarkdown } from '../runner/campaignLoop.js';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { validateScenario } from '../scenario/schema.js';
@@ -14,6 +15,19 @@ async function main() {
     if (!input || flag < 0 || !args[flag + 1])
         throw new Error('Usage: npm run sim -- scenarios/file.json --out out/name');
     const s = validateScenario(JSON.parse(readFileSync(resolve(input), 'utf8'))), out = resolve(args[flag + 1]!);
+    const rules = args.indexOf('--rules');
+    if (rules >= 0) {
+        if (args[rules + 1] !== 'campaign') throw new Error('Unsupported --rules value');
+        const result = await runCampaignLoop({ scenario: s });
+        mkdirSync(out, { recursive: true });
+        for (const [name, rows] of Object.entries({ facts: result.facts, decisions: result.decisions, audit: result.audit, notifications: result.notifications, 'port-calls': result.portCalls }))
+            writeFileSync(resolve(out, `${name}.jsonl`), rows.map(row => JSON.stringify(row)).join('\n') + (rows.length ? '\n' : ''));
+        writeFileSync(resolve(out, 'timeline.md'), timelineMarkdown(result.timeline));
+        const summary = { seed: s.seed, days: s.days, decisions: result.decisions.length, notifications: result.notifications.length, campaigns: result.state.campaigns };
+        writeFileSync(resolve(out, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
+        process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
+        return;
+    }
     const start = date(s.startDate, s.marketplace.zone), end = start.plus({ days: s.days }), clock = new SimClock(start.toUTC().toISO()!), sink = new MemoryFactSink(), driver = new MarketDriver(s, sink), view = driver.initialView();
     const port = new FaultyFakePort(new InMemoryFakePort(), clock, s.seed, () => eventContext(s, clock.now()).apiFault);
     const campaign = (c: typeof view.campaigns[number]): Campaign => ({ id: c.id, asin: c.asin, type: c.type, targetingKind: c.type === 'AUTO' ? 'AUTO' : 'KEYWORD', status: c.status, name: c.name, dailyBudgetMicros: micros(Math.round(c.budget * 1e6)), topOfSearchPct: c.topOfSearchPct });

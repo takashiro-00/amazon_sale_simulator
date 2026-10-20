@@ -39,7 +39,8 @@ it.each(rows)("review 2 metadata %s",(id,schedule,cooldownKind,cooldownDays,kind
  expect([r.schedule,r.cooldownGate,r.cooldownSets,r.windowDays,r.blockedByTag])
  .toEqual([schedule,["R06B","R07","R08","R09"].includes(id)?null:cooldownKind,
  id==="R06B"?[{kind:"budget",days:2},{kind:"bid",days:3}]:["R07","R09"].includes(id)?[{kind:"budget",days:3},{kind:"bid",days:3}]:cooldownKind?[{kind:cooldownKind,days:cooldownDays}]:[],kind?{kind,days}:null,blocked]);
- expect(r.evaluate({group:r.group,id:"x"},{} as never)).toBeNull();
+ // Step 3 campaign rules need real context; later groups remain inert stubs.
+ if(r.group!=="CAMPAIGN")expect(r.evaluate({group:r.group,id:"x"},{} as never)).toBeNull();
 });
 it("review 3 remove tags independently of escalation",()=>{
  for(const tag of ["ALERT","MANAGE"] as const){

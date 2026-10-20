@@ -36,6 +36,7 @@ export interface SimConfig {
   readonly budgetLadder: readonly Micros[];
   readonly marketplace: { readonly id: "US"; readonly zone: string };
   readonly every3DaysAnchor: string;
+  readonly every3DaysAnchorMode: "campaign-created" | "global";
   readonly ambiguity: {
     /** Runs occur before traffic; include the change day. */ readonly changeDayCountsAsPost: boolean;
     readonly tagRulesGatedByCooldown: boolean;
@@ -47,6 +48,7 @@ export interface SimConfig {
     /** Reset only the changed entity unless explicitly configured later. */ readonly windowResetScope:
       | "entity"
       | "campaign-and-children";
+    readonly r09BudgetRestore: "pre-tag-tier" | "keep-current";
     readonly r06bWindow: "calendar14" | "wpost14";
     readonly anchorResetPolicy: "never" | "on-r15-create" | "on-params-change";
     readonly r06bOverwritesPreTagTier: boolean;
@@ -93,12 +95,16 @@ export const DEFAULT_CONFIG: SimConfig = Object.freeze({
     zone: "America/Los_Angeles",
   }),
   every3DaysAnchor: "2026-01-01",
+  // SPEC-AMBIGUITY: Campaign creation anchors tag checks unless global is explicitly selected.
+  every3DaysAnchorMode: "campaign-created",
   ambiguity: Object.freeze({
     changeDayCountsAsPost: true,
     tagRulesGatedByCooldown: false,
     crossLevelBidPolicy: "error" as const,
     tosCapIncludesHourly: true,
     windowResetScope: "entity" as const,
+    // SPEC-AMBIGUITY: Restore exactly the saved tier, rather than estimating a new budget.
+    r09BudgetRestore: "pre-tag-tier" as const,
     r06bWindow: "calendar14" as const,
     anchorResetPolicy: "never" as const,
     r06bOverwritesPreTagTier: false,

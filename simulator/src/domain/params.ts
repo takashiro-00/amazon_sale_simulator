@@ -8,6 +8,7 @@ export interface ProductParams {
   readonly expCvr?: number;
 }
 export interface DerivedThresholds {
+  readonly breakEvenAcos: number;
   readonly T_win: number;
   readonly T_ok: number;
   readonly T_bad: number;
@@ -38,9 +39,11 @@ export function deriveThresholds(
     params.priceMicros <= 0
   )
     throw new RangeError("Invalid product parameters");
-  const T_win = Math.min(c.winCap, c.winFactor * params.breakEvenAcos),
-    T_ok = Math.min(c.okCap, c.okFactor * params.breakEvenAcos),
-    T_bad = Math.min(c.badCap, c.badFactor * params.breakEvenAcos);
+  // SPEC-AMBIGUITY: Normalize decimal rate arithmetic to avoid treating 36% as below 0.9 × 40%.
+  const rate = (n: number) => Number(n.toFixed(12));
+  const T_win = rate(Math.min(c.winCap, c.winFactor * params.breakEvenAcos)),
+    T_ok = rate(Math.min(c.okCap, c.okFactor * params.breakEvenAcos)),
+    T_bad = rate(Math.min(c.badCap, c.badFactor * params.breakEvenAcos));
   const CPA_target = scaleMoney(params.priceMicros, T_win),
     N2 = Math.ceil(c.n2Orders / cv);
   const Bid_max_raw = micros(
@@ -48,6 +51,7 @@ export function deriveThresholds(
   );
   return {
     thresholds: Object.freeze({
+      breakEvenAcos: params.breakEvenAcos,
       T_win,
       T_ok,
       T_bad,

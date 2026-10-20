@@ -9,6 +9,7 @@ import {
 export type WindowSpec = {
   readonly kind: "rolling" | "post";
   readonly days: number;
+  readonly minRipeDays?: number;
 };
 export interface ResolvedWindow {
   readonly from: MarketplaceDate;
@@ -35,14 +36,15 @@ export function resolveWindow(
     changed,
     config.ambiguity.changeDayCountsAsPost ? 0 : -1,
   );
+  // SPEC-AMBIGUITY: Explicit minRipeDays makes days the post-window cap; omitted preserves Step 1 post semantics.
   const naturalFrom = dMinus(
     to,
-    (spec.kind === "rolling" ? spec.days : config.maxPostDays) - 1,
+    (spec.kind === "rolling" || spec.minRipeDays !== undefined ? spec.days : config.maxPostDays) - 1,
   );
   const from = postFrom > naturalFrom ? postFrom : naturalFrom;
   const ripeDays = Math.max(
     0,
     calendarDaysBetween(from, to, config.marketplace.zone) + 1,
   );
-  return { from, to, ripeDays, eligible: ripeDays >= spec.days };
+  return { from, to, ripeDays, eligible: ripeDays >= (spec.minRipeDays ?? spec.days) };
 }

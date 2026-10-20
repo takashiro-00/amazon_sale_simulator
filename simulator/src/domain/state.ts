@@ -1,10 +1,14 @@
 import { micros, scaleMoney, roundBidToCent, type Micros } from "./money.js";
 import type { Acos } from "./acos.js";
 import type { Hour } from "./entities.js";
-import { date, type MarketplaceDate, type Instant } from "../time/clock.js";
+import { date, instant, type MarketplaceDate, type Instant } from "../time/clock.js";
 import { DEFAULT_CONFIG, type SimConfig } from "../../config/defaults.js";
 export type CampaignTag = "NORMAL" | "MANAGE" | "ALERT" | "PAUSED_AUTO";
 export interface CampaignMemory {
+  readonly budgetByDate: Readonly<Record<MarketplaceDate, Micros>>;
+  readonly createdAt: Instant;
+  readonly bidRestorePending: boolean;
+  readonly lastR09CheckDate: MarketplaceDate | null;
   readonly tag: CampaignTag;
   readonly budgetTierIndex: number;
   readonly preTagTierIndex: number | null;
@@ -49,6 +53,10 @@ export function createCampaignMemory(
   if (config.budgetLadder.length === 0)
     throw new RangeError("Empty budget ladder");
   return {
+    budgetByDate: {},
+    createdAt: at,
+    bidRestorePending: false,
+    lastR09CheckDate: null,
     tag: "NORMAL",
     budgetTierIndex: 0,
     preTagTierIndex: null,
@@ -122,6 +130,18 @@ export function assertStateInvariants(
   for (const n of [m.r12Count, m.r14Count, m.clicksAtLastR12])
     if (!Number.isInteger(n) || n < 0) throw new Error("INVALID_COUNTER");
   const cooldownDates = [m.bidCooldownUntil];
+  if (state.campaignMemory) {
+    const c = state.campaignMemory;
+    instant(c.createdAt);
+    if (typeof c.bidRestorePending !== "boolean" || !Number.isInteger(c.r09ConsecutivePasses) || c.r09ConsecutivePasses < 0)
+      throw new Error("INVALID_CAMPAIGN_MEMORY");
+    if (c.lastR09CheckDate !== null) date(c.lastR09CheckDate, config.marketplace.zone);
+    if (Object.keys(c.budgetByDate).length > 35) throw new Error("INVALID_BUDGET_HISTORY");
+    for (const [day, budget] of Object.entries(c.budgetByDate)) {
+      date(day, config.marketplace.zone);
+      if (!config.budgetLadder.includes(budget)) throw new Error("INVALID_BUDGET_HISTORY");
+    }
+  }
   if (state.campaignMemory) cooldownDates.push(state.campaignMemory.cooldownUntil.budget, state.campaignMemory.cooldownUntil.placement);
   for (const until of cooldownDates) if (until !== null) {
     try { date(until, config.marketplace.zone); }

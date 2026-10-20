@@ -1,3 +1,6 @@
+import { roundBidToCent } from "../domain/money.js";
+import { scheduled } from "../rules/campaign/shared.js";
+import { startGrace } from "./cooldown.js";
 import type {
   EngineState,
   RuleId,
@@ -71,6 +74,8 @@ export function firstMatchWins(
   const inputsSnapshot = {
     state: before,
     thresholds: ctx.thresholds,
+    thresholdsByCampaign: ctx.thresholdsByCampaign,
+    factsAsOf: objectRef.group === "CAMPAIGN" && ctx.metrics ? ctx.metrics.facts(objectRef.id, "1900-01-01", toMarketplaceDate(at, ctx.config.marketplace)) : [],
     config: ctx.config,
     now: at,
   };
@@ -108,6 +113,9 @@ export function firstMatchWins(
       record(rule.id, "NOT_ELIGIBLE", ["TARGET_PAUSED"]);
       continue;
     }
+    if (rule.schedule === "every3Days" && !scheduled(campaignId ?? objectRef.id, ctx)) {
+      record(rule.id, "NOT_SCHEDULED"); continue;
+    }
     if (memory && rule.blockedByTag.includes(memory.tag)) {
       record(rule.id, "BLOCKED_BY_TAG");
       continue;
@@ -126,6 +134,9 @@ export function firstMatchWins(
         record(rule.id, "BLOCKED_BY_COOLDOWN");
         continue;
       }
+    }
+    if (objectRef.group === "CAMPAIGN" && campaignId && before.campaigns[campaignId]?.status === "PAUSED") {
+      record(rule.id, "NOT_ELIGIBLE", ["CAMPAIGN_PAUSED"]); continue;
     }
     const proposal = rule.evaluate(objectRef, { ...ctx, state: before });
     if (!proposal) {
@@ -167,6 +178,7 @@ export function firstMatchWins(
         !old ||
         !next ||
         old.baseBidMicros !== next.baseBidMicros ||
+        old.tagReductionFactor !== next.tagReductionFactor ||
         !stateEqual(old.hourlyFactor, next.hourlyFactor) ||
         (campaignId !== undefined &&
           before.campaigns[campaignId]?.topOfSearchPct !==
@@ -204,9 +216,21 @@ export function firstMatchWins(
         record(rule.id, "ERROR", reasons, after);
         continue rules;
       }
-      targets[id] = { ...next, baseBidMicros: guard.base };
+      let tagReductionFactor = next.tagReductionFactor;
+      if (old.tagReductionFactor !== next.tagReductionFactor &&
+          (guard.base !== roundBidToCent(next.baseBidMicros) || (next.tagReductionFactor < old.tagReductionFactor && guard.base === old.baseBidMicros))) {
+        // SPEC-AMBIGUITY: Track only the tag change accepted by G6; ordinary cent rounding retains the nominal factor.
+        const actual = old.tagReductionFactor * guard.base / old.baseBidMicros;
+        tagReductionFactor = Math.max(Math.min(old.tagReductionFactor, next.tagReductionFactor),
+          Math.min(Math.max(old.tagReductionFactor, next.tagReductionFactor), actual));
+      }
+      targets[id] = { ...next, baseBidMicros: guard.base, tagReductionFactor };
     }
     after = { ...after, targets };
+    if (rule.id === "R09" && campaignId && after.campaignMemory[campaignId]?.tag === "NORMAL") {
+      const pending = Object.entries(targets).some(([id, t]) => after.targetEntities[id]?.campaignId === campaignId && t.tagReductionFactor < 1);
+      after = { ...after, campaignMemory: { ...after.campaignMemory, [campaignId]: { ...after.campaignMemory[campaignId]!, bidRestorePending: pending } } };
+    }
     if (stateEqual(before, after)) {
       record(rule.id, "SKIPPED_NOOP", reasons, after);
       continue;
@@ -254,6 +278,7 @@ export function firstMatchWins(
         }
       }
     }
+    if (rule.id === "R01" && campaignId && campaignMemory[campaignId]) campaignMemory[campaignId] = startGrace(campaignMemory[campaignId]!, at, ctx.config);
     after = { ...after, targets: stampedTargets, campaignMemory };
     const decision: Decision = immutableSnapshot({
       runId: ctx.runId,
@@ -265,6 +290,7 @@ export function firstMatchWins(
       paramsVersion: ctx.paramsVersion,
     });
     ctx.decisions.push(decision);
+    for (const event of proposal.notifications ?? []) ctx.notify(event);
     record(rule.id, "MATCHED", reasons, after);
     return decision;
   }

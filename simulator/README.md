@@ -279,3 +279,170 @@ Golden 40 ngày hiện tại: 7.191 impression, 225 click, $182.053154 spend,
 
 Xác minh sau sửa: `npm run typecheck`, `npm test` (13 file, 115 test pass),
 `npm run build` đều exit 0.
+
+## Bước 3 — Campaign rules và runner ngày
+
+`src/rules/campaign/` cài R01–R09 (mỗi rule một file); R10–R21B vẫn trả `null`.
+Rule chỉ đọc context và trả proposal. Notification nằm trong proposal, engine chỉ gọi
+`notify` sau khi proposal được chấp nhận; evaluate không I/O hay sửa context.
+`MetricsReader` đọc daily campaign facts (không hour/placement) qua `queryFacts(asOf)`;
+thiếu ngày không chứng minh được 0 đơn. Lookback 30 ngày kết thúc D-2, không cắt theo reset.
+Audit chứa state, config, ngưỡng và snapshot fact đã biết tại thời điểm chạy.
+
+Runner chạy từng bucket UTC nhưng quyết định theo ngày/giờ PT, trước traffic của bucket.
+Thứ tự: đồng bộ manual edit → R01 nếu mới/bật lại → ghi budget ngày → tracker R09 →
+first-match-wins theo id campaign → kiểm bất biến → ghi FaultyFakePort không lỗi, có
+idempotency key → dựng EntityView từ budget/status/submittedBid cho market.
+Chỉ budget/placement reset cửa sổ campaign; R01 luôn reset và bắt đầu grace kể cả budget no-op.
+Tracker ghi counter/lastR09CheckDate mỗi ngày kiểm tra, không chiếm lượt G5. Campaign PAUSED
+không được đánh giá rule thường; chỉ manual PAUSED→ENABLED mới cho R01 chạy lại.
+Budget history giữ 35 ngày; sau quyết định cập nhật lại budget thực dùng cho ngày đó.
+
+`ScriptedMarket(scenario, callback | Record<campaignId, Record<date, ScriptedDay>>)` nhận
+`{clicks, spendUsd, orders, salesUsd}`. Callback nhận `{day, date, campaign}` để dựng script tiêu
+đúng budget đang chạy. Tổng nguyên được phân bổ đều qua số giờ thực của ngày (23/24/25),
+không lag attribution, phát hành daily campaign/target fact tại D+1 03:00 PT. Campaign PAUSED
+sinh số liệu 0. Script mô tả số liệu quan sát chính xác; không áp thêm budget cap.
+
+### Quyết định ambiguity mới
+
+Mỗi lựa chọn dưới đây có comment `// SPEC-AMBIGUITY:` tại mã thực thi.
+
+| Vấn đề | Mặc định / quyết định | Hệ quả |
+| --- | --- | --- |
+| `ambiguity.r09BudgetRestore` | `pre-tag-tier`; tùy chọn `keep-current` | Gỡ tag về đúng bậc đã lưu; tùy chọn kia giữ budget hiện tại |
+| `every3DaysAnchorMode` | `campaign-created`; tùy chọn `global` | Ngày tạo +3k theo lịch PT; global dùng `every3DaysAnchor` |
+| R06 `minRipeDays` | 1, cap W_post 14 ngày | Không chờ đủ 14 ngày; vẫn cần G2 và coverage đầy đủ của cửa sổ |
+| `resolveWindow` tương thích Bước 1 | Bỏ option: min = days, post cap `maxPostDays`; có option: post cap = days | Giữ test/hành vi post cũ, cho phép R06 cap 14 với min 1 |
+| R06B `calendar14` khi campaign còn mới | Khoảng 14 ngày lịch kết thúc D-2; không bắt đủ 14 fact | Có thể step 1 sớm khi đủ spend, đơn và ACoS; `wpost14` vẫn đòi 14 ngày chín sau reset |
+| Làm tròn ngưỡng tỷ lệ | Chuẩn hóa G1 tới 12 chữ số thập phân | 36% không bị coi là nhỏ hơn `0.9 × 40%` do floating point |
+| Hệ số tag khi G6 kẹp bid | Chỉ ghi phần giảm/khôi phục thực được nhận; cent rounding thường giữ hệ số danh nghĩa | Bid ở sàn không phát sinh phần giảm ảo để R09 tăng sai; chạm trần vẫn giữ pending |
+| R06 pause giữa R06B waiting | Chuyển phase thành DONE khi pause | PAUSED_AUTO không giữ STEP1_WAITING |
+| ScriptedMarket budget | Số liệu quan sát, không cap lại; PAUSED = 0 | Golden dùng số liệu chính xác và callback tiêu đúng budget |
+| Budget history trong ngày | Lưu budget sau run | R04B so spend với budget của chính ngày đó |
+| Giờ PT lặp do DST | Dispatch ngày một lần, ở lần xuất hiện đầu | `runHour=1` không khôi phục bid hai lần trong ngày 25 giờ |
+
+Manual edit giữ quy ước Bước 2: edit ở đúng ranh giới bucket có hiệu lực ở bucket kế;
+bật lại được nhận ở lần daily run tiếp theo. Budget sửa tay phải nằm trên ladder, nếu không
+runner throw. RunHour khác 00:00 kết hợp `changeDayCountsAsPost=true` vẫn có thể dùng ngày
+có traffic trước thay đổi; đây là flag có sẵn, không tự sửa chính sách.
+
+### Golden và timeline thực đo
+
+Tái tạo:
+
+```sh
+npm run typecheck
+npm test
+npm run sim -- scenarios/golden-winner.json --rules campaign --out out/golden-rules
+node scripts/campaign-goldens.mjs
+```
+
+CLI campaign ghi `facts.jsonl`, `port-calls.jsonl`, `summary.json` và thêm
+`decisions.jsonl`, `audit.jsonl`, `notifications.jsonl`, `timeline.md`.
+CLI không có `--rules` vẫn chạy market-only như Bước 2.
+
+Golden Scripted dùng startDate 2026-10-01, sản phẩm $30/BE 40%/CVR 10%. Ngày 0 tính từ ngày tạo;
+run lúc 00:00 PT. B1 tiêu đúng budget, ACoS 20%, 2 đơn và 10 click/ngày. B3 giữ B1 đến hết ngày
+12, ACoS 40% ngày 13–23 rồi 18% từ ngày 24. B4 giữ B1 đến hết ngày 13, sau đó $5 và 5 click/ngày,
+0 đơn ($15/3 ngày ≥ $12.6); biến thể hồi phục từ ngày 18. B5 ACoS 70%, tiêu $5/ngày,
+2 đơn/ngày; biến thể hồi phục 30% từ ngày 7. Các script là fixture kiểm thử quan sát,
+không buộc doanh số tổng hợp bằng đơn × giá bán.
+
+| Case | Timeline (ngày: rule → budget/tag) | Artifact |
+| --- | --- | --- |
+| B1 thắng | 0 R01 $5; 4 R02 $8; 8 R03 $10; 12 R04 $12; 20 R04B $14.40; 28 R04B $17.28; 36 R04B $20.74; tất cả NORMAL | [B1](out/B1/timeline.md) |
+| B2 0 đơn | 0 R01 $5; 6 R06 $5/PAUSED_AUTO; giữ PAUSED hết ngày 39 | [B2](out/B2/timeline.md) |
+| B3 xấu rồi hồi phục | 21 R07 $8/MANAGE/f=.9; 33 R09 $12/NORMAL; 36 R09 f=.99; 39 R09 f=1; 41 R04B $14.40; 49 R04B $17.28 | [B3](out/B3/timeline.md) |
+| B4 ALERT → pause | 18 R08 $5/ALERT; 24 R06 $5/PAUSED_AUTO | [B4](out/B4/timeline.md) |
+| B4 hồi phục | 18 R08 $5/ALERT; 27 R09 $12/NORMAL; 35 R04B $14.40 | [B4 hồi phục](out/B4-recovery/timeline.md) |
+| B5 tiếp tục 70% | 6 R06B MANAGE/$5/f=.8; 14 R06B PAUSED_AUTO, notification R06B_PAUSED | [B5](out/B5/timeline.md) |
+| B5 hồi phục 30% | 6 R06B MANAGE/$5/f=.8; 14 R06B memory-only DONE, giữ MANAGE; 18 R09 NORMAL/$5; 21/24/27 R09 khôi phục bid đến 1 | [B5 hồi phục](out/B5-recovery/timeline.md) |
+
+B2 tính tay: ngày 5 chỉ có ngày 0–3 chín, spend $20 < $21. Ngày 6 có ngày 0–4,
+spend $25, 25 click và 0 đơn: R06 khớp lần đầu, gửi R06_PAUSED.
+B3 không có R05 vì 40% < T_bad=44%. Tracker pass ở ngày 30 và 33;
+tag từ ngày 21 đã đủ 6 ngày, R09 gỡ ngày 33 và khôi phục bid ở các lịch kế tiếp.
+B5 bước 2 cần đủ 7 ngày chín sau step 1 ngày 6 nên ngày 14 mới eligible, dù ngày 13 đã đủ
+7 ngày lịch. B3 roadmap có unit test gỡ tag khi đang waiting và đồng thời đặt phase NONE, xóa r06bStep1At.
+B6 kiểm cả hai flag: R07 lưu $14.40 → $8, R06B giữ $14.40 nếu false / ghi đè $8 nếu true;
+R09 trả về đúng bậc tương ứng. Sàn hệ số .70, bid floor/trần và cent rounding có regression riêng.
+
+Smoke MarketDriver giữ nguyên `scenarios/golden-winner.json`, seed 42, 40 ngày:
+[Timeline smoke](out/golden-rules/timeline.md). R02 ngày 5 → $8, R03 ngày 9 → $10,
+R04 ngày 13 → $12, R04B ngày 21/29/37 → $14.40/$17.28/$20.74. Không pause,
+không notification, không vi phạm bất biến. Đạt $12 ngày 13, trước ngày 25.
+Khác B1 một ngày do đơn ngẫu nhiên/knowledge time, không chỉnh scenario hay rule.
+
+### Phát hiện — edge case B1 roadmap
+
+Cùng fixture B4, chỉ đổi global anchor 0/1/2 ngày. Snapshot ở
+`test/__snapshots__/campaign-loop.test.ts.snap`, dữ liệu tái tạo tại `out/edge-B1.json`.
+
+| Pha / anchor | R05 | Có ALERT / ngày | Có R06 / ngày |
+| --- | --- | --- | --- |
+| 0 / 2026-10-01 | Không | Có / 18 | Có / 24 |
+| 1 / 2026-10-02 | Ngày 18, về $5 | Có / 22 | Có / 24 |
+| 2 / 2026-10-03 | Ngày 18, về $5 | Có / 23 | Có / 24 |
+
+R05 thực sự cướp lượt ở pha 1/2 và reset cửa sổ. Fixture này vẫn đủ $15 mỗi W3 ở $5,
+nên mọi pha cuối cùng đều có ALERT; ngày gắn tag lệch 4–5 ngày. R08 ở pha 1/2 không đổi budget
+(vẫn $5), vì vậy không reset thêm cửa sổ, R06 vẫn pause ngày 24. Không khẳng định các pha
+luôn cùng kết quả cho fixture khác.
+
+Test cũ: `engine.test.ts` bổ sung các field context bắt buộc nhưng giữ kỳ vọng cũ;
+`review.test.ts` chỉ gọi stub với context rỗng cho R10–R21B, vì campaign đã có logic thật.
+Metadata campaign vẫn được kiểm đầy đủ; `registry` kiểm context thật với id không tồn tại vẫn null.
+Không thay scenario hoặc kỳ vọng market cũ. Xác minh Bước 3: typecheck và toàn bộ test pass;
+CLI campaign + script golden sinh các timeline trên.
+
+### File thay đổi Bước 3
+
+| Loại | File (tương đối trong simulator) |
+| --- | --- |
+| Mới — dữ liệu/market/runner/invariant | `src/data/metrics.ts`, `src/market/scripted.ts`, `src/runner/campaignLoop.ts`, `src/invariants/campaign.ts` |
+| Mới — rule | `src/rules/campaign/r01.ts`, `r02.ts`, `r03.ts`, `r04.ts`, `r04b.ts`, `r05.ts`, `r06.ts`, `r06b.ts`, `r07.ts`, `r08.ts`, `r09.ts`, `r09Tracker.ts`, `shared.ts` |
+| Mới — test/report | `test/campaign.test.ts`, `test/campaign-loop.test.ts`, `test/__snapshots__/campaign-loop.test.ts.snap`, `scripts/campaign-goldens.mjs` |
+| Sửa — runtime | `config/defaults.ts`, `src/audit/log.ts`, `src/cli/sim.ts`, `src/data/windows.ts`, `src/domain/params.ts`, `src/domain/state.ts`, `src/engine/priority.ts`, `src/engine/types.ts`, `src/rules/registry.ts` |
+| Sửa — test/docs | `test/cli.test.ts`, `test/engine.test.ts`, `test/review.test.ts`, `README.md` |
+
+Kết quả cuối: `npm run typecheck` exit 0; `npm test`: **15 file, 177 test pass**;
+`git diff --check -- simulator` sạch. Không dependency mới. Review độc lập phát hiện lỗi
+bookkeeping tại sàn bid và lặp daily run trong DST; cả hai đã sửa theo regression test.
+
+
+### Regression R06B kích hoạt lại sau R09
+
+R09 gỡ MANAGE/ALERT về NORMAL đồng thời đặt `r06bPhase='NONE'`,
+`r06bStep1At=null`. Quyết định ambiguity: mỗi lần campaign hồi phục về NORMAL thì
+R06B được kích hoạt lại. Invariant mới: NORMAL ⇒ phase NONE; DONE chỉ được giữ
+khi MANAGE, ALERT hoặc PAUSED_AUTO. Runner kiểm invariant sau mọi decision,
+bao gồm toàn bộ golden B1–B5; không đổi snapshot hiện có.
+
+Test `R06B rearms after recovery...` chạy ScriptedMarket 80 ngày, $30/BE 40%,
+10 click/2 đơn mỗi ngày, tiêu đúng budget: ACoS 70% ngày 0–6, 20% ngày 7–40,
+70% từ ngày 41. Timeline (ngày 0 = 2026-10-01, run 00:00 PT):
+
+| Ngày | Quyết định |
+| --- | --- |
+| 0 | R01 $5/NORMAL |
+| 6 | R06B bước 1 $5/MANAGE |
+| 14 | R06B bước 2 DONE, giữ MANAGE do đã hồi phục |
+| 15 | R09 $5/NORMAL, phase NONE và timestamp null |
+| 16/20/25 | R02/R03/R04 tăng $8/$10/$12 |
+| 18/21/24 | R09 khôi phục bid |
+| 33/41 | R04B tăng $14.40/$17.28 |
+| 45/49/53 | R05 giảm $14.40/$12/$10 |
+| 56 (2026-11-26) | R06B bước 1 lần hai $5/MANAGE, bid $1.04 → $0.84 |
+| 64 (2026-12-04) | R06B bước 2 $5/PAUSED_AUTO, notify R06B_PAUSED |
+| 65–79 | Giữ PAUSED |
+
+Ngày 55 W14 còn chứa ngày 40 ACoS 20%; ngày 56 W14 gồm ngày 41–54 đều 70%,
+vượt 1.5×BE. Bước 2 ngày 64 có đủ 7 ngày chín sau bước 1 (W7 ngày 56–62).
+Bid bước 1 đề xuất −20%, vẫn áp G6 hiện có: sàn anchor $1.05×.8=$.84 cao hơn
+đề xuất làm tròn $.83. Hệ số tag thực nhận $.84/$1.04≈.807692, không thấp hơn .70.
+Không thay guard hoặc hành vi khác, không thêm dependency.
+
+Xác minh regression: test tái hiện fail trước sửa (không có R06B lần hai); sau sửa
+`npm run typecheck` exit 0, `npm test`: **15 file, 182 test pass**; golden B1–B5
+đều qua invariant mới, không đổi snapshot. `git diff --check -- simulator` sạch.

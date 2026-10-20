@@ -1,3 +1,5 @@
+import { MetricsReader } from "../src/data/metrics.js";
+import { FactIndex } from "../src/data/facts.js";
 import { it, expect } from "vitest";
 import { DEFAULT_CONFIG } from "../config/defaults.js";
 import { usd } from "../src/domain/money.js";
@@ -112,6 +114,8 @@ function context(): RuleContext {
     },
   };
   return {
+    metrics: new MetricsReader(new FactIndex(), at, DEFAULT_CONFIG),
+    today: "2026-10-20", thresholdsByCampaign: {}, notify: () => {},
     runId: "run",
     clock: new SimClock(at),
     config: DEFAULT_CONFIG,

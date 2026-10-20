@@ -4,6 +4,7 @@ export type AuditOutcome =
   | "MATCHED"
   | "SKIPPED_NOOP"
   | "NOT_ELIGIBLE"
+  | "NOT_SCHEDULED"
   | "BLOCKED_BY_TAG"
   | "BLOCKED_BY_COOLDOWN"
   | "BLOCKED_BY_GRACE"

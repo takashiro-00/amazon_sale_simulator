@@ -1,3 +1,14 @@
+import { evaluate as R01 } from "./campaign/r01.js";
+import { evaluate as R02 } from "./campaign/r02.js";
+import { evaluate as R03 } from "./campaign/r03.js";
+import { evaluate as R04 } from "./campaign/r04.js";
+import { evaluate as R04B } from "./campaign/r04b.js";
+import { evaluate as R05 } from "./campaign/r05.js";
+import { evaluate as R06 } from "./campaign/r06.js";
+import { evaluate as R06B } from "./campaign/r06b.js";
+import { evaluate as R07 } from "./campaign/r07.js";
+import { evaluate as R08 } from "./campaign/r08.js";
+import { evaluate as R09 } from "./campaign/r09.js";
 import type { RuleId, RuleGroup, RuleDefinition } from "../engine/types.js";
 import { G6_RULES } from "../guards/bid.js";
 const IDS: readonly RuleId[] = [
@@ -73,7 +84,7 @@ export const registry: readonly RuleDefinition[] = Object.freeze(
         ...(group(id) === "CAMPAIGN" && id !== "R01" ? ["PAUSED_AUTO"] as const : []),
       ]),
       appliesG6: G6_RULES.includes(id),
-      evaluate: () => null,
+      evaluate: ({R01,R02,R03,R04,R04B,R05,R06,R06B,R07,R08,R09} as Partial<Record<RuleId, RuleDefinition["evaluate"]>>)[id] ?? (() => null),
     }),
   ),
 );
