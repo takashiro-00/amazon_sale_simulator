@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { Instant, MarketplaceDate } from "../time/clock.js";
 import type { ObjectRef, RuleId } from "../engine/types.js";
 export type AuditOutcome =
+  | "PARTIAL_APPLY"
+  | "APPLY_FAILED"
   | "MATCHED"
   | "SKIPPED_NOOP"
   | "SKIPPED_CROSS_LEVEL"

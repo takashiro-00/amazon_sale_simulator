@@ -14,6 +14,8 @@ export interface BatchResult {
     readonly error?: string;
 }
 export interface AmazonAdsPort {
+    getCampaigns(ids: readonly string[], key?: string): Promise<readonly Campaign[]>;
+    listTargets(campaignId: string, key?: string): Promise<readonly Target[]>;
     updateCampaign(campaign: Campaign, idempotencyKey: string): Promise<void>;
     updateTargets(updates: readonly TargetUpdate[], endpoint: TargetEndpoint, idempotencyKey: string): Promise<readonly BatchResult[]>;
     createKeywords(keywords: readonly Target[], idempotencyKey: string): Promise<readonly BatchResult[]>;
@@ -47,6 +49,8 @@ function negativeKey(n: NegativeKeyword): string {
 }
 /** Offline fake only. No adapter, network transport, credentials, or SDK. */
 export class InMemoryFakePort implements AmazonAdsPort {
+    readonly idempotencyLog: { operation: string; key: string }[] = [];
+    readonly #readSnapshots = new Map<string, unknown>();
     readonly #campaigns = new Map<string, Campaign>();
     readonly #keywords = new Map<string, Target>();
     readonly #targets = new Map<string, Target>();
@@ -62,6 +66,21 @@ export class InMemoryFakePort implements AmazonAdsPort {
     }
     private remember(key: string, operation: string, payload: unknown): void {
         this.#keys.set(JSON.stringify([operation, key]), hash([operation, payload]));
+        this.idempotencyLog.push({operation,key});
+    }
+    async getCampaigns(ids: readonly string[], key = ''): Promise<readonly Campaign[]> {
+        return this.snapshotRead(`campaigns:${key}`, key, [...this.#campaigns.values()].filter(c => ids.includes(c.id)));
+    }
+    async listTargets(campaignId: string, key = ''): Promise<readonly Target[]> {
+        return this.snapshotRead(`targets:${campaignId}:${key}`, key, [...this.#keywords.values(), ...this.#targets.values()].filter(t => t.campaignId === campaignId));
+    }
+    private snapshotRead<T>(identity: string, key: string, value: T): T {
+        // SPEC-AMBIGUITY: daily read keys freeze the initial remote view for crash replay.
+        if (key.startsWith('daily:')) {
+            if (!this.#readSnapshots.has(identity)) this.#readSnapshots.set(identity, structuredClone(value));
+            return structuredClone(this.#readSnapshots.get(identity)) as T;
+        }
+        return structuredClone(value);
     }
     async updateCampaign(campaign: Campaign, key: string): Promise<void> {
         if (this.replay(key, "updateCampaign", campaign))

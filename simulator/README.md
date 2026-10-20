@@ -492,3 +492,74 @@ Không đổi golden hay snapshot campaign. Assertion audit no-op trong `test/en
 **E6: harvest làm campaign nguồn mất toàn bộ đơn → R06 pause vĩnh viễn.** AUTO nguồn tăng budget ngày 4 (2026-10-05); term tốt được harvest Chủ Nhật 10-04 và negative ở nguồn sau xác minh ngày 5 (10-06). R06 pause vào ngày 8 (10-09), yêu cầu người dùng xác nhận mới bật lại. W_post ngày 8 là **10-05–10-07**, 470 impressions, **33 clicks, $23.287437 spend, 0 orders, $0 sales** (ACoS infinite); vượt Spend_zero=$21 và N2=20. Hai ngày zero-order kiểm tra thêm 10-06–10-07 có 22 clicks/$15.353274. Scenario chỉ có **hai search term**, nên khi bỏ term tốt, toàn bộ traffic còn lại là term rác; hiện tượng bị phóng đại. Đây là phát hiện mô hình/scenario, không thay đổi rule.
 
 CLI full-account tạo đủ audit.jsonl, decisions.jsonl, notifications.jsonl, port-calls.jsonl và timeline.md; 34 decisions, 41 API calls đều thành công. Kết quả kiểm chứng và số liệu cuối xem [step-4-status.md](docs/step-4-status.md).
+
+## Bước 5 — executor, drift, crash, edge, Monte Carlo và report
+
+`src/runner/executor.ts` dựng WritePlan theo thứ tự: campaign (name/tag, budget, status nguyên tử), placement, từng target/keyword, negative. Retry tối đa `api.maxAttempts=4` cho 429/5xx và phần tử lỗi transient; key không đổi. `retryAfterSeconds` cộng vào `waitSeconds`, không đổi SimClock. Chỉ entity ack mới commit; target lỗi giữ memory/cooldown/window/flag cũ. Outcome `PARTIAL_APPLY`/`APPLY_FAILED` và notification `API_WRITE_FAILED` ghi rõ lỗi. Bid của kế hoạch có thay đổi ToS dùng trần an toàn cho cả ToS trước/sau để vẫn hợp lệ nếu placement lỗi. R09 còn target khôi phục lỗi giữ `bidRestorePending`. R21B chỉ cập nhật sent map với target ack và thử lại target lỗi ở boundary kế tiếp. Lỗi lập trình và `CrashError` vẫn throw.
+
+`src/runner/reconcile.ts` đọc campaigns và mọi loại target trước daily rules. Mặc định tin Amazon; `ambiguity.driftPolicy='trust-engine'` repair remote bằng retry. Drift ghi `DRIFT_DETECTED` cùng fields; không reset window/cooldown/anchor. Bid base nhận từ bid remote chia factor giờ marketplace; PAUSED_AUTO chỉ chạy R01 khi đọc thấy console enable. Manual edit tác động vào backing InMemoryFakePort; thị trường dùng trạng thái Amazon thực tế, kể cả write thành công một phần.
+
+`runDaily` nhận state, port, clock, facts, thresholds và dữ liệu submitted bid/ack, trả state cùng decisions/audit/notifications, sent/ack và thời gian chờ. Run ID tất định từ instant marketplace. Fake API giữ snapshot đọc đầu tiên theo key `daily:<runId>` để replay không hiểu nhầm ghi dở dang thành sửa tay. `CrashingPort` ném sau lần ghi thành công thứ N, trước khi caller commit ack. Regression crash tại N=1,2,5,half,last−1: snapshot trước run + cùng API cho state/API/idempotency log giống clean run, R12 ×0.8 chỉ áp một lần. Đây là mô hình crash với cùng port được giữ lại, không phải persistence ra database ngoài simulator.
+
+Suite `scenarios/edge/*.json` ghi một kết quả cho mỗi A1–E6 và chaos-account vào `out/edge`. INVARIANT kiểm thất bại thật; MEASURE lưu số liệu, không sửa rule để đẹp kết quả. Các fixture regression Bước 3–4 chạy lại bằng Vitest từ CLI edge; C3 kiểm 5 chu kỳ MANAGE/NORMAL. Chaos chạy 60 ngày với rate limit 10%, server error 5%, partial batch 10%, stale read 30 phút, hai console edit và price change. `hourlyAnalyses` lưu evidence/factor thực tế của R20/R21 để đo tác động, kể cả giờ thiếu bằng chứng; không đếm nhầm chúng như daily decision.
+
+Monte Carlo dùng worker_threads (auto tối đa 8 worker), audit matched, seed đánh số 0…N−1, kết quả runs theo thứ tự seed. Kiểm worker thật 1/2 cho cùng kết quả. `matureFacts` flush riêng tới cuối +15 ngày; premature gọi lại đúng evaluator với state, instant, params và cửa sổ gốc, chỉ đổi asOf. R05B tách đúng nhánh zero-order. Wasted spend hợp nhất các vùng target/search term bị tác động để không đếm kép R06/R13/negative. Summary có phân vị, mean/min/max, tỷ lệ run pause sớm; compare chạy cùng seed và ghi diff, kể cả loại notification chỉ xuất hiện ở một phía.
+
+```sh
+npm run typecheck
+npm test
+npm run edge -- --out out/edge
+npm run mc -- scenarios/full-account.json --seeds 100 --workers auto --out out/mc/full-account
+npm run mc -- scenarios/edge/attribution-storm-account.json --seeds 100 --compare 'ambiguity.changeDayCountsAsPost=false' --out out/mc/storm
+npm run report -- --edge out/edge --mc out/mc/full-account --mc out/mc/storm --out out/report
+```
+
+Report HTML/Markdown sinh từ dữ liệu đã lưu, sort ổn định, không dùng thời gian hệ thống. HTML tự chứa, chart SVG inline, light/dark theo `prefers-color-scheme`, không URL/script ngoài. README Bước 3–4 là nguồn các phát hiện lịch/reset/harvest; report bổ sung evidence edge và Monte Carlo, chỉ đề xuất sửa spec.
+
+### Các SPEC-AMBIGUITY mới của Bước 5
+
+| Flag | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| driftPolicy | trust-amazon | Giá trị console được nhận vào engine; có thể chọn trust-engine. |
+| staleReadPolicy | acknowledged-write-grace | Không nhận read cũ trong `api.staleReadGraceMinutes=30` sau ack; có thể chọn trust-read. |
+| dailyReadPolicy | snapshot-per-run | Cùng run ID đọc lại cùng snapshot ban đầu để replay. |
+| offLadderBudgetPolicy | nearest-tier | Budget console ngoài ladder dùng bậc gần nhất để giữ invariant budget; tie chọn bậc thấp hơn. |
+| mcTierScope | first-campaign | Time-to-tier của account là campaign đầu tiên đạt $12/$25; đã đạt lúc bắt đầu thì 0. |
+| wastedSpendThresholdPolicy | prorate-crossing-day | Bucket ngày vượt N2 được phân bổ theo phần click sau ngưỡng. |
+| incompleteRecoveryWindow | exclude | D2 không tính sự kiện thiếu đủ 14 ngày sau R07. |
+
+Grace của stale read cần đặt ít nhất bằng độ trễ đọc giả lập. Console sửa trong grace có thể được nhận trễ tới daily run kế tiếp; API không có revision nên chưa thể phân biệt read cũ và sửa tay ngay sau ack. Đây là lựa chọn được công khai bằng flag, không suy đoán sửa tay từ một stale read.
+
+### Tương thích test cũ
+
+Không đổi rule, golden hay snapshot Bước 3–4. Test manual bid cũ đổi từ yêu cầu synthetic decision `MANUAL_EDIT` sang `DRIFT_DETECTED`, vì yêu cầu Bước 5 thay đường R10 giả lập bằng console + reconcile; giữ window/anchor theo hợp đồng drift. Test discovery scenario lọc file `.json` ở cấp root thay vì đọc cả thư mục `edge/`. Assertion `CREATE_FAILED` cũ được giữ cùng audit failure mới.
+
+### Kết quả chạy thật Bước 5
+
+| Bộ Monte Carlo | Số lượt | Thời gian | Profit p50 | Flip-flops budget / bid p50 (/30 ngày) | Run có pause sớm | Invariant max |
+| --- | --- | --- | --- | --- | --- | --- |
+| full-account | 100 | 108.896 giây | $8,801.912132 | 0.5 / 0.5 | 0% | 0 |
+| storm mặc định | 100 | 301.311 giây | $8,815.009223 | 0.5 / 0.5 | 0% | 0 |
+| storm changeDayCountsAsPost=false | 100 | cùng lệnh storm | $8,212.071795 | 0 / 0 | 0% | 0 |
+
+Thời gian storm **301,311 giây là tổng 200 lượt** (100 seed × hai cấu hình), không phải 100 lượt. Full-account 100 seed ×60 ngày **108,896 giây**, đạt mốc <5 phút trên máy này với auto=8 worker. Các lượt chạy có thể chậm khi song song với full suite; benchmark trên là lệnh yêu cầu thực tế.
+
+| Premature (tổng 100 seed) | full-account | storm | storm compare |
+| --- | --- | --- | --- |
+| R06 | 0 | 0 | 0 |
+| R13 | 0 | 0 | 0 |
+| R12 | 0 | 0 | 0 |
+| R16 | 0 | 0 | 0 |
+| R17 | 0 | 0 | 0 |
+| R05B | 0 | 0 | 0 |
+| R08 | 0 | 0 | 1 |
+
+Compare làm profit p50 giảm **$602,937428**, flip-flops p50 về 0/0; có một R08 sớm, không có R06/R13 pause sớm. Không suy rộng tỷ lệ 0 từ những market/seed này sang mọi thị trường. API failures/drift của ba bộ Monte Carlo đều 0 vì hai scenario MC không bật API chaos; stress API nằm trong edge suite.
+
+### Phát hiện Bước 5
+
+- **Attribution:** A1 một seed và MC storm mặc định 100 seed không ghi nhận quyết định sớm theo phép đánh giá lại đúng rule/cửa sổ. Compare `changeDayCountsAsPost=false` có **1 R08 sớm/100 seed**. Đề xuất đánh giá thêm market gần ngưỡng và maturity lag trước khi thay spec; không thay rule.
+- **B2:** ba pha đều có **$50** zero-order calendar spend tới R06; cửa sổ tại R06 có **$25** zero-order spend, so với **Spend_zero=$21**. Đề xuất tách cửa sổ giám sát lãng phí tích lũy khỏi window reset do budget.
+- **A5/A6:** **5.020 target-hour** cạn budget/thiếu impressions; R20 giảm giờ thiếu dữ liệu **0**. Noise 10% gây tổng lệch spend hourly so với daily **$122,960463**; 624 bản phân tích factor thật, R20/R21 đổi factor **0/0** trong fixture này. Đề xuất spec quy định riêng exposure/budget-capped trước khi học hệ số giờ.
+- **C2:** ba target đứng im >30 ngày. **D2:** một R07 có đủ 14 ngày theo dõi, ACoS sau đó **19,375% < T_win 28%**. Đề xuất cửa sổ/điều kiện phục hồi rõ ràng để đánh giá vòng xoáy chết và baseline may mắn.
+- **E6:** nguồn có **11 đơn/$14,230770** trước harvest, **4 đơn/$28,187445** sau harvest; R06 ngày 8. Đề xuất theo dõi đồng thời ASIN và campaign, xét grace sau harvest. Không suy ra quan hệ nhân quả chỉ từ before/after này.

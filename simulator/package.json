@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
-    "sim": "npm run build && node dist/src/cli/sim.js"
+    "sim": "npm run build && node dist/src/cli/sim.js",
+    "mc": "npm run build && node dist/src/cli/mc.js",
+    "edge": "npm run build && node dist/src/cli/edge.js",
+    "report": "npm run build && node dist/src/cli/report.js"
   },
   "dependencies": {
     "luxon": "^3.7.2"

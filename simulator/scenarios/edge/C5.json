@@ -1,0 +1,6 @@
+{
+  "id": "C5",
+  "type": "INVARIANT",
+  "scenario": "../full-account.json",
+  "runner": "src/edge/suite.ts"
+}

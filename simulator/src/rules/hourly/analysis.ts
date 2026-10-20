@@ -1,3 +1,4 @@
+import { retryBatch } from '../../api/retry.js';
 import type { RuleContext,EngineState } from '../../engine/types.js';
 import type { TargetMemory,CampaignTag } from '../../domain/state.js';
 import type { Hour } from '../../domain/entities.js';
@@ -14,7 +15,8 @@ export function outboundBid(m:TargetMemory,h:Hour,t:DerivedThresholds,tos:number
  if(cap<t.Bid_min)throw new Error('EMPTY_BID_RANGE');
  return micros(Math.max(t.Bid_min,Math.min(cap,roundBidToCent(micros(Math.round(m.baseBidMicros*f))))));
 }
-export function analyzeHours(c:RuleContext,only?:"R20"|"R21"):EngineState{
+export interface HourlyAnalysisRecord {at:string;targetId:string;hour:Hour;before:number;after:number;clicks:number;impressions:number;orders:number;budgetCapped:boolean;}
+export function analyzeHours(c:RuleContext,only?:"R20"|"R21",onAnalysis?:(record:HourlyAnalysisRecord)=>void):EngineState{
  if(instant(c.clock.now()).setZone(c.config.marketplace.zone).weekday!==c.config.hourlyAnalysisWeekday)return c.state;
  const targets={...c.state.targets};
  for(const [id,e] of Object.entries(c.state.targetEntities)){
@@ -31,18 +33,18 @@ export function analyzeHours(c:RuleContext,only?:"R20"|"R21"):EngineState{
     if(only!=='R21'&&a.orders/a.clicks<.5*cv)factor=Math.max(.70,t.Bid_min/m.baseBidMicros);
     else if(only!=='R20'&&c.state.campaignMemory[e.campaignId]?.tag==='NORMAL'&&a.orders>=2&&cv>0&&a.orders/a.clicks>=1.3*cv)factor=Math.min(1.15,t.Bid_max/m.baseBidMicros,1.5*t.Bid_max/(1+tos/100)/m.baseBidMicros);
    }
-   factors[h]=factor;
+   factors[h]=factor;onAnalysis?.({at:c.clock.now(),targetId:id,hour:h,before:m.hourlyFactor[h],after:factor,clicks:a.clicks,impressions:a.impressions,orders:a.orders,budgetCapped:fs.some(f=>f.hour===h&&f.budgetCapped===true)});
   }
   targets[id]={...m,hourlyFactor:factors};
  }
  return {...c.state,targets};
 }
-export async function submitBoundary(at:string,state:EngineState,thresholds:Readonly<Record<string,DerivedThresholds>>,port:AmazonAdsPort,sent:Map<string,number>,done:Set<string>,config:SimConfig=DEFAULT_CONFIG){
+export async function submitBoundary(at:string,state:EngineState,thresholds:Readonly<Record<string,DerivedThresholds>>,port:AmazonAdsPort,sent:Map<string,number>,done:Set<string>,config:SimConfig=DEFAULT_CONFIG,onResult?:(r:{acked:string[];failures:string[];waitSeconds:number})=>void){
  const bucket=hourlyBucket(at);if(done.has(bucket))return;
  const h=marketplaceHour(at,config.marketplace);
  for(const endpoint of ['/sp/keywords','/sp/targets'] as const){
   const updates=Object.entries(state.targetEntities).filter(([id,e])=>e.status==='ENABLED'&&state.campaigns[e.campaignId]?.status==='ENABLED'&&(e.kind==='KEYWORD'?'/sp/keywords':'/sp/targets')===endpoint).map(([id,target])=>({target,bidMicros:outboundBid(state.targets[id]!,h,thresholds[id]!,state.campaigns[target.campaignId]!.topOfSearchPct,state.campaignMemory[target.campaignId]?.tag??'NORMAL')})).filter(u=>sent.get(u.target.id)!==u.bidMicros);
-  if(updates.length){const results=await port.updateTargets(updates,endpoint,`R21B:${bucket}:${endpoint}`);for(const result of results)if(result.ok)sent.set(result.id,updates.find(u=>u.target.id===result.id)!.bidMicros);}
+  if(updates.length){const result=await retryBatch(updates,u=>u.target.id,pending=>port.updateTargets(pending,endpoint,`R21B:${bucket}:${endpoint}`),config.api.maxAttempts);for(const id of result.acked)sent.set(id,updates.find(u=>u.target.id===id)!.bidMicros);onResult?.(result);}
  }
  done.add(bucket);
 }

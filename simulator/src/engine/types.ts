@@ -63,7 +63,7 @@ export interface EngineState {
 }
 export interface NotificationLog {
  readonly at: string; readonly campaignId: string;
- readonly type: "R06_PAUSED" | "R06B_PAUSED" | "R08_ALERT" | "PRODUCT_INFEASIBLE" | "R13_PAUSED" | "R15_VERIFY_TIMEOUT" | "EMPTY_BID_RANGE";
+ readonly type: "API_WRITE_FAILED" | "DRIFT_DETECTED" | "R06_PAUSED" | "R06B_PAUSED" | "R08_ALERT" | "PRODUCT_INFEASIBLE" | "R13_PAUSED" | "R15_VERIFY_TIMEOUT" | "EMPTY_BID_RANGE";
  readonly details: Readonly<Record<string, unknown>>;
 }
 export interface Proposal {
@@ -73,6 +73,7 @@ export interface Proposal {
   readonly reasons?: readonly string[];
 }
 export interface Decision {
+ readonly asOf?: string;
  readonly reasons?: readonly string[];
  readonly outboundTargets?: readonly import("../api/port.js").TargetUpdate[];
   readonly runId: string;

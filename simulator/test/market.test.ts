@@ -28,7 +28,7 @@ describe('seeded world', () => {
         expect(simulateHour({ ...base, status: 'PAUSED' }, new Rng(5)).impressions).toBe(0);
     });
     it('validates all examples and gives field paths', () => {
-        for (const f of readdirSync('scenarios'))
+        for (const f of readdirSync('scenarios').filter(f=>f.endsWith('.json')))
             expect(() => validateScenario(JSON.parse(readFileSync(`scenarios/${f}`, 'utf8')))).not.toThrow();
         const s = load();
         s.campaigns[0]!.targets[0]!.trueCvr = -1;

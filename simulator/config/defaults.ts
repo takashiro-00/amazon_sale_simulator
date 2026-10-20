@@ -1,5 +1,6 @@
 import { usd, type Micros } from "../src/domain/money.js";
 export interface SimConfig {
+  readonly api: { readonly maxAttempts: number; readonly staleReadGraceMinutes: number };
   readonly audit: { readonly level: "matched" | "all" };
   readonly thresholds: { readonly r10r11Clicks: number; readonly hourlyClicks: number };
   readonly hourlyAnalysisWeekday: number;
@@ -41,6 +42,13 @@ export interface SimConfig {
   readonly every3DaysAnchor: string;
   readonly every3DaysAnchorMode: "campaign-created" | "global";
   readonly ambiguity: {
+    readonly dailyReadPolicy: "snapshot-per-run";
+    readonly offLadderBudgetPolicy: "nearest-tier";
+    readonly mcTierScope: "first-campaign";
+    readonly wastedSpendThresholdPolicy: "prorate-crossing-day";
+    readonly incompleteRecoveryWindow: "exclude";
+    readonly driftPolicy: "trust-amazon" | "trust-engine";
+    readonly staleReadPolicy: "acknowledged-write-grace" | "trust-read";
     readonly placementWindow: "post14-min7";
     readonly hourlyScope: "campaign" | "target";
     readonly r14CountResetAfterFlag: boolean;
@@ -64,6 +72,7 @@ export interface SimConfig {
   };
 }
 export const DEFAULT_CONFIG: SimConfig = Object.freeze({
+  api: Object.freeze({ maxAttempts: 4, staleReadGraceMinutes: 30 }),
   audit: Object.freeze({ level: "all" as const }),
   thresholds: Object.freeze({ r10r11Clicks: 15, hourlyClicks: 40 }),
   hourlyAnalysisWeekday: 1,
@@ -106,6 +115,19 @@ export const DEFAULT_CONFIG: SimConfig = Object.freeze({
   // SPEC-AMBIGUITY: Campaign creation anchors tag checks unless global is explicitly selected.
   every3DaysAnchorMode: "campaign-created",
   ambiguity: Object.freeze({
+    // SPEC-AMBIGUITY: Console values win unless an acknowledged write is still within the read consistency grace.
+    // SPEC-AMBIGUITY: Daily remote reads replay their first snapshot under the same deterministic run ID.
+    dailyReadPolicy: "snapshot-per-run" as const,
+    // SPEC-AMBIGUITY: Off-ladder console budgets snap to the closest valid budget tier.
+    offLadderBudgetPolicy: "nearest-tier" as const,
+    // SPEC-AMBIGUITY: Account time-to-tier uses the first campaign reaching the tier.
+    mcTierScope: "first-campaign" as const,
+    // SPEC-AMBIGUITY: N2 crossing within a daily bucket prorates that day's spend.
+    wastedSpendThresholdPolicy: "prorate-crossing-day" as const,
+    // SPEC-AMBIGUITY: D2 excludes tags without a complete fourteen-day future observation window.
+    incompleteRecoveryWindow: "exclude" as const,
+    driftPolicy: "trust-amazon" as const,
+    staleReadPolicy: "acknowledged-write-grace" as const,
     placementWindow: "post14-min7" as const,
     hourlyScope: "campaign" as const,
     r14CountResetAfterFlag: true,

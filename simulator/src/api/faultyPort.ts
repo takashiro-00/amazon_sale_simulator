@@ -32,7 +32,11 @@ export class FaultyFakePort implements AmazonAdsPort {
     private override: FaultConfig | undefined;
     private readonly rng: Rng;
     private readonly fingerprints = new Map<string, string>();
+    private readonly batchIdentities = new Map<string, Set<string>>();
     private readonly successes = new Map<string, Map<string, BatchResult>>();
+    private readonly campaignStale = new Map<string, Stale<Campaign>[]>();
+    private readonly targetStale = new Map<string, Stale<Target>[]>();
+    private readonly readSnapshots = new Map<string, unknown>();
     private readonly keywordStale = new Map<string, Stale<Target>[]>();
     private readonly negativeStale = new Map<string, Stale<NegativeKeyword>[]>();
     private readonly invisible = new Map<string, number>();
@@ -74,7 +78,9 @@ export class FaultyFakePort implements AmazonAdsPort {
         }
     }
     private async batch<T>(op: string, items: readonly T[], key: string, id: (x: T) => string, write: (x: T, k: string) => Promise<readonly BatchResult[]>, campaign: (x: T) => string, kind: 'keyword' | 'negative', create = false): Promise<readonly BatchResult[]> {
-        return this.call(op, key, items, true, async (r, c) => {
+        const batchKey=JSON.stringify([op,key]),identities=this.batchIdentities.get(batchKey);if(identities&&items.some(item=>!identities.has(id(item))))throw new Error('IDEMPOTENCY_KEY_REUSED');if(!identities)this.batchIdentities.set(batchKey,new Set(items.map(id)));
+        for(const item of items){const k=JSON.stringify([op,key,id(item)]),fingerprint=hash(item),old=this.fingerprints.get(k);if(old&&old!==fingerprint)throw new Error('IDEMPOTENCY_KEY_REUSED');this.fingerprints.set(k,fingerprint);}
+        return this.call(op, key, null, true, async (r, c) => {
             const cacheKey = JSON.stringify([op, key]), success = this.successes.get(cacheKey) ?? new Map<string, BatchResult>();
             this.successes.set(cacheKey, success);
             const partial = r.uniform() < (c.partialBatch?.probability ?? 0), results: BatchResult[] = [];
@@ -89,13 +95,14 @@ export class FaultyFakePort implements AmazonAdsPort {
                     results.push({ id: identity, ok: false, error: 'TRANSIENT_ITEM_ERROR' });
                     continue;
                 }
-                const cid = campaign(item), now = Date.parse(this.clock.now()), before = kind === 'keyword' ? await this.inner.listKeywords(cid, 'snapshot') : await this.inner.listNegatives(cid, 'snapshot');
+                const cid = campaign(item), targetBefore = await this.inner.listTargets(cid), now = Date.parse(this.clock.now()), before = kind === 'keyword' ? await this.inner.listKeywords(cid, 'snapshot') : await this.inner.listNegatives(cid, 'snapshot');
                 try {
-                    await write(item, `${key}:${i}`);
+                    await write(item, `${key}:${identity}`);
                     const result = { id: identity, ok: true };
                     success.set(identity, result);
                     results.push(result);
                     if (c.staleReadMinutes) {
+                        const targetList=this.targetStale.get(cid)??[];targetList.push({until:now+c.staleReadMinutes*60000,value:targetBefore});this.targetStale.set(cid,targetList);
                         if (kind === 'keyword') {
                             const list = this.keywordStale.get(cid) ?? [];
                             list.push({ until: now + c.staleReadMinutes * 60000, value: before as Target[] });
@@ -118,10 +125,14 @@ export class FaultyFakePort implements AmazonAdsPort {
         });
     }
     updateCampaign(c: Campaign, key: string): Promise<void> {
-        return this.call('updateCampaign', key, c, true, async () => this.inner.updateCampaign(c, key));
+        return this.call('updateCampaign', key, c, true, async (_,config) => {
+            const before=await this.inner.getCampaigns([c.id]);
+            await this.inner.updateCampaign(c,key);
+            if(config.staleReadMinutes&&before.length){const list=this.campaignStale.get(c.id)??[];list.push({until:Date.parse(this.clock.now())+config.staleReadMinutes*60000,value:before});this.campaignStale.set(c.id,list);}
+        });
     }
     updatePlacement(id: string, pct: number, key: string): Promise<void> {
-        return this.call('updatePlacement', key, [id, pct], true, async () => this.inner.updatePlacement(id, pct, key));
+        return this.call('updatePlacement', key, [id, pct], true, async (_,config) => {const before=await this.inner.getCampaigns([id]);await this.inner.updatePlacement(id,pct,key);if(config.staleReadMinutes){const list=this.campaignStale.get(id)??[];list.push({until:Date.parse(this.clock.now())+config.staleReadMinutes*60000,value:before});this.campaignStale.set(id,list);}});
     }
     updateTargets(items: readonly TargetUpdate[], endpoint: TargetEndpoint, key: string): Promise<readonly BatchResult[]> {
         return this.batch(`updateTargets:${endpoint}`, items, key, u => u.target.id, (u, k) => this.inner.updateTargets([u], endpoint, k), u => u.target.campaignId, 'keyword');
@@ -131,6 +142,19 @@ export class FaultyFakePort implements AmazonAdsPort {
     }
     createNegatives(items: readonly NegativeKeyword[], key: string): Promise<readonly BatchResult[]> {
         return this.batch('createNegatives', items, key, n => JSON.stringify([n.campaignId, n.adGroupId ?? null, n.text, n.matchType]), (n, k) => this.inner.createNegatives([n], k), n => n.campaignId, 'negative');
+    }
+    private snapshot<T>(identity:string,key:string,value:T):T {
+        if(key.startsWith('daily:')){if(!this.readSnapshots.has(identity))this.readSnapshots.set(identity,structuredClone(value));return structuredClone(this.readSnapshots.get(identity)) as T;}
+        return structuredClone(value);
+    }
+    getCampaigns(ids:readonly string[],key='read'):Promise<readonly Campaign[]> {
+        return this.call('getCampaigns',key,ids,false,async()=>{
+            const values:Campaign[]=[];for(const id of ids){const stale=(this.campaignStale.get(id)??[]).filter(x=>x.until>Date.parse(this.clock.now()));this.campaignStale.set(id,stale);values.push(...(stale[0]?.value??await this.inner.getCampaigns([id])));}
+            return this.snapshot(`campaigns:${key}`,key,values);
+        });
+    }
+    listTargets(id:string,key='read'):Promise<readonly Target[]> {
+        return this.call('listTargets',key,id,false,async()=>{const stale=(this.targetStale.get(id)??[]).filter(x=>x.until>Date.parse(this.clock.now()));this.targetStale.set(id,stale);return this.snapshot(`targets:${id}:${key}`,key,stale[0]?.value??await this.inner.listTargets(id));});
     }
     listKeywords(id: string, key: string): Promise<readonly Target[]> {
         return this.call('listKeywords', key, id, false, async () => {

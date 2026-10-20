@@ -76,7 +76,7 @@ export function firstMatchWins(
     if (ctx.config.audit.level === 'matched' && outcome !== 'MATCHED' && outcome !== 'ERROR') return;
     const diff = outcome === 'MATCHED' || outcome === 'ERROR' ? stateDiff(before, after) : {before:{},after:{}};
     ctx.audit.append({runId:ctx.runId, at, marketplaceDate:toMarketplaceDate(at,ctx.config.marketplace),objectRef,ruleId,outcome,reasons,
-      inputsSnapshot:{reads:ctx.metrics.recordedReads,paramsVersion:ctx.paramsVersion,configHash,now:at},...diff,paramsVersion:ctx.paramsVersion});
+      inputsSnapshot:{asOf:ctx.metrics.asOf,reads:ctx.metrics.recordedReads,paramsVersion:ctx.paramsVersion,configHash,now:at},...diff,paramsVersion:ctx.paramsVersion});
   };
   ctx.metrics.resetReads();
   const entity = before.targetEntities[objectRef.id];
@@ -269,6 +269,7 @@ export function firstMatchWins(
     if (rule.id === "R01" && campaignId && campaignMemory[campaignId]) campaignMemory[campaignId] = startGrace(campaignMemory[campaignId]!, at, ctx.config);
     after = { ...after, targets: stampedTargets, campaignMemory };
     const decision: Decision = immutableSnapshot({
+      asOf:ctx.metrics.asOf,
       runId: ctx.runId,
       objectRef,
       ruleId: rule.id,

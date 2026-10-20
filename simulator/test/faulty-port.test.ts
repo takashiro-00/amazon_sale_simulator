@@ -47,3 +47,8 @@ it('stale reads and invisible creates expire exactly at N minutes', async () => 
     clock.advanceHours(2 / 60);
     expect((await port.listKeywords('c', 'r'))[0]!.bidMicros).toBe(900000);
 });
+it('subset retries keep the original batch key without rewriting successful entities',async()=>{
+ const {retryBatch}=await import('../src/api/retry.js');const clock=new SimClock('2026-10-01T00:00Z'),inner=new InMemoryFakePort(),p=new FaultyFakePort(inner,clock,42,{partialBatch:{probability:1}}),items=Array.from({length:8},(_,i)=>target(`t${i}`)),batches:string[][]=[];
+ const result=await retryBatch(items,t=>t.id,async pending=>{batches.push(pending.map(t=>t.id));const r=await p.createKeywords(pending,'subset');p.configure({});return r;},4);
+ expect(result.failures).toEqual([]);expect(batches).toHaveLength(2);expect(batches[1]!.length).toBeLessThan(8);expect(inner.idempotencyLog.filter(x=>x.operation==='createKeywords')).toHaveLength(8);expect(p.calls.filter(c=>c.op==='createKeywords').map(c=>c.idempotencyKey)).toEqual(['subset','subset']);
+});

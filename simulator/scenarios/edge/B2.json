@@ -1,0 +1,6 @@
+{
+  "id": "B2",
+  "type": "MEASURE",
+  "scenario": "../full-account.json",
+  "runner": "src/edge/suite.ts"
+}
