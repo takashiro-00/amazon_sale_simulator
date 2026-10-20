@@ -62,7 +62,7 @@ export function clampBid(
     (config.ambiguity.tosCapIncludesHourly ? hourlyFactor : 1);
   const tosUpper = scaleMoney(thresholds.Bid_max, c.tosCap / effectiveMultiplier, "floor");
   const hardLow = Math.ceil(thresholds.Bid_min / MICROS_PER_CENT) * MICROS_PER_CENT;
-  const hardHigh = Math.floor(Math.min(thresholds.Bid_max, tosUpper) / MICROS_PER_CENT) * MICROS_PER_CENT;
+  const hardHigh = Math.floor(Math.min(thresholds.Bid_max / Math.max(1, hourlyFactor), tosUpper) / MICROS_PER_CENT) * MICROS_PER_CENT;
   if (hardLow > hardHigh)
     return { base: null, reasons: ["EMPTY_BID_RANGE"], warnings: ["EMPTY_BID_RANGE"] };
   const anchorLow = scaleMoney(anchor, c.anchorMin, "ceil");

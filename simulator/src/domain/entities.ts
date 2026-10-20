@@ -60,6 +60,7 @@ export interface SearchTerm {
   readonly query: string;
 }
 export interface NegativeKeyword {
+  readonly harvestKeywordId?: string;
   readonly campaignId: string;
   readonly adGroupId?: string;
   readonly text: string;

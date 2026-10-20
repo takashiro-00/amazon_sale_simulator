@@ -446,3 +446,49 @@ Không thay guard hoặc hành vi khác, không thêm dependency.
 Xác minh regression: test tái hiện fail trước sửa (không có R06B lần hai); sau sửa
 `npm run typecheck` exit 0, `npm test`: **15 file, 182 test pass**; golden B1–B5
 đều qua invariant mới, không đổi snapshot. `git diff --check -- simulator` sạch.
+
+## Bước 4 — account rules
+
+Implementation follows `docs/step-4-plan.md`. Only the simulator changes; no dependencies are added. `runCampaignLoop` remains campaign-only; `runAccountLoop` runs the full account.
+
+Daily PT order: manual edit/R01 → budget history → R09 tracker → CAMPAIGN → PLACEMENT → TARGET → pending harvest verification → SEARCHTERM → weekly hourly analysis. Each UTC hour runs R21B before market traffic. Both repeated 01:00 hours at DST fallback are distinct instants.
+
+`campaign-first` skips the complete TARGET group when R06B/R07/R09 already wrote that target's base in the run (`SKIPPED_CROSS_LEVEL`). `error` remains available for conflict tests. Placement-only decisions never lower target bases. Base proposals pass G6 using the maximum of the 24 factors. Product hard corrections take precedence over soft anchor/step limits after price changes and emit `EMPTY_BID_RANGE` when half the anchor exceeds the new maximum.
+
+R15 creates an Exact, persists pending only after successful creation, then verifies its ID and normalized query with `listKeywords`. Source Negative Exact follows a positive read only. Pending checks run daily, including weekdays; after seven days they time out without adding a negative. Negatives carry harvest provenance and are deduplicated by campaign/normalized text. Market truth for a harvested target inherits source CTR/auction parameters, source CVR × term multiplier and source impressions × term share. A campaign negative removes that query from all of its targets and reduces impressions by the removed share; it does not redistribute the share.
+
+Placement uses its own post-change window. REST with ≥30 clicks and zero orders has CVR=0: the formula is literally `CVR_TOP >= 2 * 0`, still requiring TOP ≥30 clicks, ≥3 orders and winning ACoS. Positive orders with zero sales yield infinite ACoS for R11/R19.
+
+| New/refined config | Default | Meaning |
+| --- | --- | --- |
+| ambiguity.crossLevelBidPolicy | campaign-first | Campaign writes suppress target group; error for tests |
+| ambiguity.placementWindow | post14-min7 | Placement origin, max 14 days, min seven ripe days |
+| ambiguity.hourlyScope | campaign | Campaign hourly evidence; target mode supported |
+| ambiguity.r14CountResetAfterFlag | true | Restart R14 count after its 30-day flag expires |
+| thresholds.r10r11Clicks | 15 | Target sample gate |
+| thresholds.hourlyClicks | 40 | Hourly sample gate |
+| hourlyAnalysisWeekday | 1 | Monday PT |
+
+Golden zero-order target ($30, BE 40%, anchor $.80):
+
+| Run day | Mature evidence | Action |
+| --- | --- | --- |
+| 5 | D0–D3 each five clicks/$2.80 = 20 clicks/$11.20 | R12 $.80 → $.64; waste flag |
+| 6 | D4 adds zero clicks | No action |
+| 7 | D5 adds ten clicks/$5.60 = 30 clicks/$16.80 | R13 PAUSED; ten clicks since R12 |
+
+Two foundation-test premises necessarily change with the brief: `engine.test.ts` explicitly selects `error` for its conflict test; its hourly-only proposal now asserts unchanged base ($1 rather than $.81). No campaign golden expectations or snapshots change. Registry metadata remains compatible with the prior metadata tests; actual placement evaluation resolves the refined post window.
+
+Full-account scenario premises (before its first smoke run): 60 days from 2026-10-01, seed `full-account-20261020`, product $30/BE40%/expected CVR10%. Discovery divides demand equally between a high-conversion harvest term and a zero-conversion waste term. Manual winner offsets bleeder spend so campaign zero-order pause does not mask R13. Bleeder starts at $1 to make ≥$16.80 feasible by 30 clicks. The low-impression target has zero CTR and a steep impression response near $.60, so three 15% raises should make its subsequent W7 exceed 100 impressions. Creation remains invisible for 60 minutes, requiring a later verification run before a source negative. If these premises do not produce the required observations, stop with measurements; do not tune rules to pass.
+
+Smoke đã pass với kỳ vọng được sửa: mỗi chu kỳ cờ R14 có tối đa ba lần tăng, hai lần tăng cách nhau ít nhất bảy ngày. Trong 60 ngày, low tăng **5 lần**, chia chu kỳ **3 + 2**: 10-09/10-16/10-23 và 11-22/11-29; bid $.40 → $.46 → $.53 → $.61 → $.70 → $.80. W7 tương ứng 0, 0, 4, 53, 76 impressions. Scenario được giữ nguyên. Regression 120 ngày với impression luôn thấp kiểm tra nhiều chu kỳ ba lần tăng và cờ 30 ngày, độc lập với hard cap của engine.
+
+Audit lưu diff đệ quy của các field thay đổi, gồm cả negative/harvest khi liên quan; phía thiếu field được biểu diễn bằng null. Event không khớp có before/after rỗng. inputsSnapshot chỉ có reads ({query, from, to, totals}), paramsVersion, configHash (SHA-256), now. Mỗi rule có recorder riêng; metrics daily lọc hourly/placement trước khi resolve fact, giữ nguyên daily totals. Decision trong bộ nhớ vẫn đầy đủ; decisions.jsonl chỉ lưu diff và metadata. CLI ghi JSONL từng dòng với backpressure; AuditLog cung cấp iterator event và jsonLines, không làm I/O. `config.audit.level` mặc định `all`; `matched` giữ MATCHED/ERROR để dùng cho Monte Carlo.
+
+Không đổi golden hay snapshot campaign. Assertion audit no-op trong `test/engine.test.ts` buộc đổi từ `after: ctx.state` sang `before: {}, after: {}` theo hợp đồng diff mới; kiểm tra no-op/cooldown giữ nguyên.
+
+## Phát hiện Bước 4
+
+**E6: harvest làm campaign nguồn mất toàn bộ đơn → R06 pause vĩnh viễn.** AUTO nguồn tăng budget ngày 4 (2026-10-05); term tốt được harvest Chủ Nhật 10-04 và negative ở nguồn sau xác minh ngày 5 (10-06). R06 pause vào ngày 8 (10-09), yêu cầu người dùng xác nhận mới bật lại. W_post ngày 8 là **10-05–10-07**, 470 impressions, **33 clicks, $23.287437 spend, 0 orders, $0 sales** (ACoS infinite); vượt Spend_zero=$21 và N2=20. Hai ngày zero-order kiểm tra thêm 10-06–10-07 có 22 clicks/$15.353274. Scenario chỉ có **hai search term**, nên khi bỏ term tốt, toàn bộ traffic còn lại là term rác; hiện tượng bị phóng đại. Đây là phát hiện mô hình/scenario, không thay đổi rule.
+
+CLI full-account tạo đủ audit.jsonl, decisions.jsonl, notifications.jsonl, port-calls.jsonl và timeline.md; 34 decisions, 41 API calls đều thành công. Kết quả kiểm chứng và số liệu cuối xem [step-4-status.md](docs/step-4-status.md).

@@ -30,6 +30,7 @@ export interface CampaignMemory {
   readonly requiresUserConfirmToEnable: boolean;
 }
 export interface TargetMemory {
+  readonly createdAt?: Instant;
   readonly baseBidMicros: Micros;
   readonly anchorBidMicros: Micros;
   readonly tagReductionFactor: number;
@@ -80,6 +81,7 @@ export function createTargetMemory(
   config: SimConfig,
 ): TargetMemory {
   return {
+    createdAt: at,
     baseBidMicros: base,
     anchorBidMicros: base,
     tagReductionFactor: 1,

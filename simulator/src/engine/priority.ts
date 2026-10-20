@@ -12,7 +12,7 @@ import type {
 import { isInCooldown, isGraceBlocked, applyResetOnEffectiveChange, type CooldownKind } from "./cooldown.js";
 import { marketplaceHour, toMarketplaceDate, instant } from "../time/clock.js";
 import { clampBid, G6_RULES } from "../guards/bid.js";
-import { immutableSnapshot, type AuditOutcome } from "../audit/log.js";
+import { immutableSnapshot, stateDiff, configHash as hashConfig, type AuditOutcome } from "../audit/log.js";
 export const CAMPAIGN = [
   "R06",
   "R06B",
@@ -71,45 +71,34 @@ export function firstMatchWins(
     return null;
   const at = ctx.clock.now(),
     before = immutableSnapshot(ctx.state);
-  const inputsSnapshot = {
-    state: before,
-    thresholds: ctx.thresholds,
-    thresholdsByCampaign: ctx.thresholdsByCampaign,
-    factsAsOf: objectRef.group === "CAMPAIGN" && ctx.metrics ? ctx.metrics.facts(objectRef.id, "1900-01-01", toMarketplaceDate(at, ctx.config.marketplace)) : [],
-    config: ctx.config,
-    now: at,
+  const configHash = hashConfig(ctx.config);
+  const record = (ruleId: RuleId, outcome: AuditOutcome, reasons: readonly string[] = [], after: unknown = before): void => {
+    if (ctx.config.audit.level === 'matched' && outcome !== 'MATCHED' && outcome !== 'ERROR') return;
+    const diff = outcome === 'MATCHED' || outcome === 'ERROR' ? stateDiff(before, after) : {before:{},after:{}};
+    ctx.audit.append({runId:ctx.runId, at, marketplaceDate:toMarketplaceDate(at,ctx.config.marketplace),objectRef,ruleId,outcome,reasons,
+      inputsSnapshot:{reads:ctx.metrics.recordedReads,paramsVersion:ctx.paramsVersion,configHash,now:at},...diff,paramsVersion:ctx.paramsVersion});
   };
-  const record = (
-    ruleId: RuleId,
-    outcome: AuditOutcome,
-    reasons: readonly string[] = [],
-    after: unknown = before,
-  ): void =>
-    ctx.audit.append({
-      runId: ctx.runId,
-      at,
-      marketplaceDate: toMarketplaceDate(at, ctx.config.marketplace),
-      objectRef,
-      ruleId,
-      outcome,
-      reasons,
-      inputsSnapshot,
-      before,
-      after,
-      paramsVersion: ctx.paramsVersion,
-    });
+  ctx.metrics.resetReads();
   const entity = before.targetEntities[objectRef.id];
   const campaignId =
     objectRef.group === "CAMPAIGN" || objectRef.group === "PLACEMENT"
       ? objectRef.id
       : (objectRef.campaignId ?? entity?.campaignId);
   const memory = campaignId ? before.campaignMemory[campaignId] : undefined;
+  // SPEC-AMBIGUITY: campaign-first suppresses the whole target group, even status-only actions.
+  if (objectRef.group === "TARGET" && ctx.config.ambiguity.crossLevelBidPolicy === "campaign-first" &&
+      ctx.decisions.some(d => d.runId === ctx.runId && d.objectRef.group === "CAMPAIGN" &&
+        ["R06B", "R07", "R09"].includes(d.ruleId) && d.baseBidTargetIds.includes(objectRef.id))) {
+    for (const rule of orderedRules) record(rule.id, "SKIPPED_CROSS_LEVEL", ["CROSS_LEVEL_BID_CONFLICT"]);
+    return null;
+  }
   rules: for (const rule of orderedRules) {
+    ctx.metrics.resetReads();
     if (rule.group !== objectRef.group) {
       record(rule.id, "NOT_ELIGIBLE", ["WRONG_RULE_GROUP"]);
       continue;
     }
-    if (objectRef.group === "HOURLY" && entity?.status === "PAUSED") {
+    if ((objectRef.group === "HOURLY" || objectRef.group === "TARGET") && entity?.status === "PAUSED") {
       record(rule.id, "NOT_ELIGIBLE", ["TARGET_PAUSED"]);
       continue;
     }
@@ -135,12 +124,12 @@ export function firstMatchWins(
         continue;
       }
     }
-    if (objectRef.group === "CAMPAIGN" && campaignId && before.campaigns[campaignId]?.status === "PAUSED") {
+    if (campaignId && before.campaigns[campaignId]?.status === "PAUSED") {
       record(rule.id, "NOT_ELIGIBLE", ["CAMPAIGN_PAUSED"]); continue;
     }
     const proposal = rule.evaluate(objectRef, { ...ctx, state: before });
     if (!proposal) {
-      record(rule.id, "NOT_ELIGIBLE");
+      record(rule.id, "NOT_ELIGIBLE", rule.diagnose?.(objectRef, { ...ctx, state: before }) ?? []);
       continue;
     }
     let after = immutableSnapshot(proposal.proposedState);
@@ -179,21 +168,17 @@ export function firstMatchWins(
         !next ||
         old.baseBidMicros !== next.baseBidMicros ||
         old.tagReductionFactor !== next.tagReductionFactor ||
-        !stateEqual(old.hourlyFactor, next.hourlyFactor) ||
-        (campaignId !== undefined &&
-          before.campaigns[campaignId]?.topOfSearchPct !==
-            after.campaigns[campaignId]?.topOfSearchPct)
+        false
       );
     });
     for (const id of affectedIds) {
-      const old = before.targets[id],
-        next = targets[id],
-        thresholds = ctx.thresholds[id];
-      if (!old || !next) throw new Error("TARGET_CREATION_REQUIRES_LATER_STEP");
+      const next = targets[id]!;
+      const old = before.targets[id] ?? next;
+      const thresholds = ctx.thresholds[id] ?? ctx.thresholdsByCampaign[after.targetEntities[id]!.campaignId];
       if (!(rule.appliesG6 || G6_RULES.includes(rule.id)))
         throw new Error("BID_WRITE_REQUIRES_G6");
       if (!thresholds) throw new Error("MISSING_TARGET_THRESHOLDS");
-      const target = before.targetEntities[id],
+      const target = after.targetEntities[id],
         campaign = target ? after.campaigns[target.campaignId] : undefined;
       const guard = clampBid(
         {
@@ -203,7 +188,7 @@ export function firstMatchWins(
           thresholds,
           tosPct: campaign?.topOfSearchPct ?? 0,
           hourlyFactor:
-            next.hourlyFactor[marketplaceHour(at, ctx.config.marketplace)],
+            Math.max(...Object.values(next.hourlyFactor)),
           ruleId: rule.id,
         },
         ctx.config,
@@ -231,7 +216,10 @@ export function firstMatchWins(
       const pending = Object.entries(targets).some(([id, t]) => after.targetEntities[id]?.campaignId === campaignId && t.tagReductionFactor < 1);
       after = { ...after, campaignMemory: { ...after.campaignMemory, [campaignId]: { ...after.campaignMemory[campaignId]!, bidRestorePending: pending } } };
     }
-    if (stateEqual(before, after)) {
+    if (objectRef.group === "TARGET" && ["R10","R11","R12","R14"].includes(rule.id) && changedBaseIds(before, after).length === 0) {
+      record(rule.id, "SKIPPED_NOOP", reasons, before); continue;
+    }
+    if (stateEqual(before, after) && !proposal.outboundTargets?.length) {
       record(rule.id, "SKIPPED_NOOP", reasons, after);
       continue;
     }
@@ -287,7 +275,9 @@ export function firstMatchWins(
       before,
       after,
       baseBidTargetIds,
+      ...(reasons.length ? { reasons } : {}),
       paramsVersion: ctx.paramsVersion,
+      ...(proposal.outboundTargets ? { outboundTargets: proposal.outboundTargets } : {}),
     });
     ctx.decisions.push(decision);
     for (const event of proposal.notifications ?? []) ctx.notify(event);

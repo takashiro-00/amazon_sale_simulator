@@ -44,8 +44,16 @@ export interface ObjectRef {
   readonly group: RuleGroup;
   readonly id: string;
   readonly campaignId?: string;
+  readonly sourceTargetId?: string;
+  readonly query?: string;
+}
+export interface PendingHarvest {
+ readonly query: string; readonly sourceCampaignId: string; readonly sourceTargetId: string; readonly destCampaignId: string; readonly keywordId: string; readonly createdAt: string;
 }
 export interface EngineState {
+ readonly negatives?: Readonly<Record<string, readonly import("../domain/entities.js").NegativeKeyword[]>>;
+ readonly pendingHarvests?: readonly PendingHarvest[];
+ readonly verifiedHarvests?: readonly PendingHarvest[];
   readonly campaigns: Readonly<Record<string, Campaign>>;
   readonly campaignMemory: Readonly<Record<string, CampaignMemory>>;
   readonly targets: Readonly<Record<string, TargetMemory>>;
@@ -55,15 +63,18 @@ export interface EngineState {
 }
 export interface NotificationLog {
  readonly at: string; readonly campaignId: string;
- readonly type: "R06_PAUSED" | "R06B_PAUSED" | "R08_ALERT" | "PRODUCT_INFEASIBLE";
+ readonly type: "R06_PAUSED" | "R06B_PAUSED" | "R08_ALERT" | "PRODUCT_INFEASIBLE" | "R13_PAUSED" | "R15_VERIFY_TIMEOUT" | "EMPTY_BID_RANGE";
  readonly details: Readonly<Record<string, unknown>>;
 }
 export interface Proposal {
+ readonly outboundTargets?: readonly import("../api/port.js").TargetUpdate[];
   readonly notifications?: readonly NotificationLog[];
   readonly proposedState: EngineState;
   readonly reasons?: readonly string[];
 }
 export interface Decision {
+ readonly reasons?: readonly string[];
+ readonly outboundTargets?: readonly import("../api/port.js").TargetUpdate[];
   readonly runId: string;
   readonly objectRef: ObjectRef;
   readonly ruleId: RuleId;
@@ -73,6 +84,8 @@ export interface Decision {
   readonly paramsVersion: string;
 }
 export interface RuleContext {
+ readonly submittedBids?: Readonly<Record<string,number>>;
+ readonly harvestDestinations?: Readonly<Record<string,string>>;
   readonly metrics: import("../data/metrics.js").MetricsReader;
   readonly thresholdsByCampaign: Readonly<Record<string, DerivedThresholds>>;
   readonly today: string;
@@ -96,5 +109,6 @@ export interface RuleDefinition {
   readonly windowDays: import("../data/windows.js").WindowSpec | null;
   readonly blockedByTag: readonly CampaignTag[];
   readonly appliesG6: boolean;
+  readonly diagnose?: (ref: ObjectRef, ctx: RuleContext) => readonly string[];
   readonly evaluate: (ref: ObjectRef, ctx: RuleContext) => Proposal | null;
 }

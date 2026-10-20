@@ -1,3 +1,4 @@
+import { normalizeText } from '../api/tags.js';
 import { date, instant } from '../time/clock.js';
 export interface Truth {
     trueCvr: number;
@@ -14,6 +15,7 @@ export interface Truth {
     }[];
 }
 export interface ScenarioTarget extends Truth {
+    matchType?: "EXACT" | "PHRASE" | "BROAD";
     id: string;
     bid: number;
     status: 'ENABLED' | 'PAUSED';
@@ -21,6 +23,7 @@ export interface ScenarioTarget extends Truth {
     text: string;
 }
 export interface ScenarioCampaign {
+    harvestDestinationCampaignId?: string;
     id: string;
     asin: string;
     name: string;
@@ -238,6 +241,7 @@ export function validateScenario(value: unknown): Scenario {
             t.kind ??= c.type === 'AUTO' ? 'AUTO' : 'KEYWORD';
             t.text ??= t.id;
             enumeration(t.kind, `${q}.kind`, ['AUTO', 'KEYWORD', 'PRODUCT']);
+            if(t.kind === 'KEYWORD'){ t.matchType ??= 'EXACT'; enumeration(t.matchType, `${q}.matchType`, ['EXACT','PHRASE','BROAD']); }
             enumeration(t.status, `${q}.status`, ['ENABLED', 'PAUSED']);
             str(t.text, `${q}.text`);
             num(t.bid, `${q}.bid`, Number.MIN_VALUE);
@@ -258,7 +262,7 @@ export function validateScenario(value: unknown): Scenario {
             const queries = new Set<string>();
             arr(t.searchTerms, `${q}.searchTerms`).forEach((v, k) => {
                 const r = `${q}.searchTerms[${k}]`, o = obj(v, r);
-                const query = str(o.query, `${r}.query`);
+                const query = normalizeText(str(o.query, `${r}.query`));
                 if (queries.has(query))
                     fail(`${r}.query`, 'must be unique within target');
                 queries.add(query);
@@ -269,6 +273,10 @@ export function validateScenario(value: unknown): Scenario {
                 fail(`${q}.searchTerms`, 'must have positive total weight');
         });
     });
+    for (const [i,c] of (s.campaigns as Record<string, unknown>[]).entries()) if(c.harvestDestinationCampaignId !== undefined){
+        const id=str(c.harvestDestinationCampaignId, `campaigns[${i}].harvestDestinationCampaignId`);
+        if(!(s.campaigns as Record<string, unknown>[]).some(d=>d.id===id && d.type==='MANUAL' && d.asin===c.asin)) fail(`campaigns[${i}].harvestDestinationCampaignId`, 'must reference MANUAL campaign with same ASIN');
+    }
     const a = obj(s.attribution, 'attribution');
     dist(a.lagDistribution, 'attribution.lagDistribution');
     a.returnLagDays ??= 7;

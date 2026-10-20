@@ -4,7 +4,14 @@ import type { EntityView } from './driver.js';
 import type { MetricFact } from '../data/facts.js';
 import { micros } from '../domain/money.js';
 import { calendarDaysBetween, date, instant, toMarketplaceDate } from '../time/clock.js';
+export interface ScriptedMetrics { clicks:number; spendUsd:number; orders:number; salesUsd:number; impressions?:number; }
+export interface ScriptedTarget extends ScriptedMetrics {
+ placements?: Partial<Record<'TOP'|'REST_OF_SEARCH',ScriptedMetrics>>;
+ searchTerms?: Record<string,ScriptedMetrics>;
+ hourlyWeights?: readonly number[];
+}
 export interface ScriptedDay {
+    targets?: Readonly<Record<string,ScriptedTarget>>;
     clicks: number;
     spendUsd: number;
     orders: number;
@@ -21,6 +28,10 @@ export class ScriptedMarket implements MarketModel {
     private readonly published = new Set<string>();
     private last = -Infinity;
     constructor(readonly scenario: Scenario, readonly script: DailyScript | Readonly<Record<string, Readonly<Record<string, ScriptedDay>>>>) { }
+    private add(entityRef:string,day:string,knownAt:string,values:{impressions:number;clicks:number;spendMicros:number;orders:number;salesMicros:number},extra:Partial<Pick<MetricFact,'hour'|'hourBucket'|'placement'>>={}) {
+        const key=JSON.stringify([entityRef,day,extra]),old=this.totals.get(key);
+        this.totals.set(key,{entityRef,marketplaceDate:day,knownAt,...extra,impressions:(old?.impressions??0)+values.impressions,clicks:(old?.clicks??0)+values.clicks,orders:(old?.orders??0)+values.orders,spendMicros:micros((old?.spendMicros??0)+values.spendMicros),salesMicros:micros((old?.salesMicros??0)+values.salesMicros)});
+    }
     step(at: string, view: EntityView) {
         const time = instant(at);
         if (time.toMillis() <= this.last || time.minute || time.second || time.millisecond)
@@ -32,6 +43,23 @@ export class ScriptedMarket implements MarketModel {
             const plan = typeof this.script === 'function' ? this.script({ day: calendarDaysBetween(this.scenario.startDate, day, this.scenario.marketplace.zone), date: day, campaign: c }) : this.script[c.id]?.[day];
             if (!plan)
                 throw new Error(`MISSING_SCRIPT:${c.id}:${day}`);
+            if(plan.targets){
+                const knownAt=next.set({hour:3}).toUTC().toISO()!;
+                const aggregate={impressions:0,clicks:0,orders:0,spendMicros:0,salesMicros:0};
+                for(const t of c.targets){
+                    const p=plan.targets[t.id]??{clicks:0,orders:0,spendUsd:0,salesUsd:0};
+                    const buckets=Array.from({length:hours},(_,i)=>start.plus({hours:i}).hour);
+                    const weights=buckets.map(h=>p.hourlyWeights?.[h]??1),sum=weights.reduce((a,b)=>a+b,0);
+                    const before=weights.slice(0,hourIndex).reduce((a,b)=>a+b,0)/sum,after=before+(weights[hourIndex]??0)/sum;
+                    const slice=(a:ScriptedMetrics)=>{const v={impressions:a.impressions??a.clicks*10,clicks:a.clicks,orders:a.orders,spendMicros:Math.round(a.spendUsd*1e6),salesMicros:Math.round(a.salesUsd*1e6)};return Object.fromEntries(Object.entries(v).map(([k,n])=>[k,c.status==='PAUSED'||t.status==='PAUSED'||sum===0?0:Math.floor(n*after+1e-7)-Math.floor(n*before+1e-7)])) as typeof aggregate;};
+                    const v=slice(p);for(const k of Object.keys(aggregate) as (keyof typeof aggregate)[])aggregate[k]+=v[k];
+                    this.add(t.id,day,knownAt,v);this.add(t.id,day,knownAt,v,{hour:time.setZone(this.scenario.marketplace.zone).hour as import('../domain/entities.js').Hour,hourBucket:time.toUTC().toISO()!});
+                    for(const [placement,a] of Object.entries(p.placements??{})){const v=slice(a);this.add(t.id,day,knownAt,v,{placement:placement as 'TOP'|'REST_OF_SEARCH'});this.add(c.id,day,knownAt,v,{placement:placement as 'TOP'|'REST_OF_SEARCH'});}
+                    for(const [query,a] of Object.entries(p.searchTerms??{})){const v=slice(a);this.add(`${t.id}:search:${query.trim().toLowerCase().replace(/\s+/g,' ')}`,day,knownAt,v);}
+                }
+                this.add(c.id,day,knownAt,aggregate);this.add(c.id,day,knownAt,aggregate,{hour:time.setZone(this.scenario.marketplace.zone).hour as import('../domain/entities.js').Hour,hourBucket:time.toUTC().toISO()!});
+                spendByCampaign[c.id]=aggregate.spendMicros;continue;
+            }
             const total = { impressions: plan.clicks * 10, clicks: plan.clicks, spendMicros: Math.round(plan.spendUsd * 1e6), orders: plan.orders, salesMicros: Math.round(plan.salesUsd * 1e6) };
             // SPEC-AMBIGUITY: Scripted totals describe observed spend; enabled traffic is not re-capped by budget.
             const slice = Object.fromEntries(Object.entries(total).map(([k, v]) => [k, c.status === 'PAUSED' ? 0 : Math.floor(v * (hourIndex + 1) / hours) - Math.floor(v * hourIndex / hours)])) as typeof total;

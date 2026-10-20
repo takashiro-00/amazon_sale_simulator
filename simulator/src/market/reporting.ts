@@ -1,3 +1,4 @@
+import { normalizeText } from '../api/tags.js';
 import type { MetricFact } from '../data/facts.js';
 import type { Micros } from '../domain/money.js';
 import type { Hour, Placement } from '../domain/entities.js';
@@ -85,9 +86,10 @@ export class Reporter {
     constructor(private readonly s: Scenario, private readonly sink: FactSink) {
         for (const c of s.campaigns)
             for (const t of c.targets)
-                this.terms.set(t.id, t.searchTerms);
+                this.terms.set(t.id, t.searchTerms.map(t=>({query:normalizeText(t.query)})));
     }
     record(observation: Observation): void {
+        this.terms.set(observation.entityRef,[...new Set([...(this.terms.get(observation.entityRef)??[]).map(t=>t.query),...observation.result.slices.map(s=>normalizeText(s.query))])].map(query=>({query}))); 
         for (const o of [observation, { ...observation, sourceTargetId: observation.entityRef, entityRef: observation.campaignId }]) {
             const firstStream = isoFromMillis(Date.parse(o.hourBucket) + 7200000);
             const firstDaily = dailyRelease(o.marketplaceDate, 1, this.s.marketplace.zone);
@@ -154,14 +156,14 @@ export class Reporter {
                     noise = new Rng(this.s.seed).fork(`noise:${o.entityRef}:${o.hourBucket}`).uniform(1 - this.s.hourlyNoise, 1 + this.s.hourlyNoise);
                 const visible = (placement?: Placement, query?: string): Metrics => {
                     const m = emptyMetrics();
-                    const slices = o.result.slices.filter(s => (!placement || s.placement === placement) && (!query || s.query === query));
+                    const slices = o.result.slices.filter(s => (!placement || s.placement === placement) && (!query || normalizeText(s.query) === query));
                     for (const s of slices) {
                         m.impressions += s.impressions;
                         m.clicks += s.clicks;
                         m.spendMicros += s.spendMicros;
                     }
                     for (const order of o.orders)
-                        if ((!placement || order.placement === placement) && (!query || order.query === query) && Date.parse(order.knownAt) <= Date.parse(knownAt) && (!order.returnedAt || Date.parse(order.returnedAt) > Date.parse(knownAt))) {
+                        if ((!placement || order.placement === placement) && (!query || normalizeText(order.query) === query) && Date.parse(order.knownAt) <= Date.parse(knownAt) && (!order.returnedAt || Date.parse(order.returnedAt) > Date.parse(knownAt))) {
                             m.orders++;
                             m.salesMicros += order.salesMicros;
                         }

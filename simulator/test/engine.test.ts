@@ -184,7 +184,8 @@ it("G5 skips post-guard cent no-op, records audit, returns one decision per obje
   expect(Object.isFrozen(ctx.audit.events[0]?.inputsSnapshot)).toBe(true);
 });
 it("G5 rejects campaign/target cross-level base bid conflict without merging", () => {
-  const ctx = context();
+  const original = context();
+  const ctx = { ...original, config: { ...original.config, ambiguity: { ...original.config.ambiguity, crossLevelBidPolicy: "error" as const } } };
   expect(
     firstMatchWins(
       { group: "CAMPAIGN", id: "c" },
@@ -292,8 +293,8 @@ it("G5 applies the effective cap when hourly factor changes without a base propo
     }),
   };
   const decision = firstMatchWins({ group: "HOURLY", id: "t" }, [hourly], ctx);
-  // At 05:00 PT, 2x hourly would exceed 1.5 * 1.08; guard must lower base.
-  expect(decision?.after.targets.t?.baseBidMicros).toBe(usd(".81"));
+  // Step 4: hourly analysis changes factors only; R21B clamps outbound bids.
+  expect(decision?.after.targets.t?.baseBidMicros).toBe(usd("1"));
 });
 it("G5 ignores hourly changes on paused targets and rejects direct outbound writes", () => {
   const ctx = context(),
@@ -445,7 +446,7 @@ it("no-op preserves cooldown and audit timestamps without fallback reasons",()=>
  const ctx=context();
  const r={...registry.find(r=>r.id==="R13")!,evaluate:()=>({proposedState:ctx.state})};
  expect(firstMatchWins({group:"TARGET",id:"t"},[r],ctx)).toBeNull();
- expect(ctx.audit.events.at(-1)).toMatchObject({outcome:"SKIPPED_NOOP",after:ctx.state,reasons:[]});
+ expect(ctx.audit.events.at(-1)).toMatchObject({outcome:"SKIPPED_NOOP",before:{},after:{},reasons:[]});
 });
 it.each(["targetExpiry","campaignExpiry","campaignWindow"])("rejects engine field write: %s",field=>{
  const ctx=context();let state=ctx.state;

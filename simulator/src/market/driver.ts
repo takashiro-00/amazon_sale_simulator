@@ -6,11 +6,17 @@ import { demandHour, allocateCampaign, emptyMetrics } from './model.js';
 import { eventContext, productAt } from './events.js';
 import { MemoryFactSink, Reporter, observation, type FactSink, type Observation } from './reporting.js';
 import { queryFacts, type MetricFact } from '../data/facts.js';
+export function harvestedTruth(source: ScenarioTarget, query: string): import('../scenario/schema.js').Truth {
+    const term=source.searchTerms.find(t=>normalizeText(t.query)===normalizeText(query));
+    if(!term) throw new Error('UNKNOWN_HARVEST_TERM');
+    return {...source,trueCvr:source.trueCvr*term.cvrMultiplier,baseImpressionsPerDay:source.baseImpressionsPerDay*term.weight/source.searchTerms.reduce((n,t)=>n+t.weight,0),searchTerms:[{query:normalizeText(query),weight:1,cvrMultiplier:1}]};
+}
 function targetRngKey(campaignId: string, view: Pick<ScenarioTarget, 'kind' | 'text'>): string {
     return `target:${campaignId}:${view.kind}:${normalizeText(view.text)}`;
 }
 export interface EntityView {
     campaigns: ScenarioCampaign[];
+    negatives?: Readonly<Record<string, readonly import("../domain/entities.js").NegativeKeyword[]>>;
 }
 export class MarketDriver {
     private readonly rng: Rng;
@@ -49,7 +55,10 @@ export class MarketDriver {
             // SPEC-AMBIGUITY: Seeded campaign-hour impression shuffle shares a binding cap fairly; target forks use campaign + kind + normalized text, independent of target ID.
             const targets = c.targets;
             const demands = targets.map(view => {
-                const truth = this.scenario.campaigns.flatMap(c => c.targets).find(t => t.id === view.id);
+                let truth = this.scenario.campaigns.flatMap(c => c.targets).find(t => t.id === view.id) ?? view;
+                const blocked=new Set((entityView.negatives?.[c.id]??[]).map(n=>normalizeText(n.text)));
+                if(blocked.size){const sum=truth.searchTerms.reduce((n,t)=>n+t.weight,0),terms=truth.searchTerms.filter(t=>!blocked.has(normalizeText(t.query)));
+                    truth={...truth,searchTerms:terms,baseImpressionsPerDay:truth.baseImpressionsPerDay*terms.reduce((n,t)=>n+t.weight,0)/sum};}
                 if (!truth)
                     throw new Error(`UNKNOWN_TARGET:${view.id}`);
                 if (this.exhausted.has(c.id))

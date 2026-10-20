@@ -1,3 +1,18 @@
+import { evaluate as R20 } from "./hourly/r20.js";
+import { evaluate as R21 } from "./hourly/r21.js";
+import { evaluate as R21B } from "./hourly/r21b.js";
+import { evaluate as R15 } from "./searchTerm/r15.js";
+import { evaluate as R16 } from "./searchTerm/r16.js";
+import { evaluate as R17 } from "./searchTerm/r17.js";
+import { diagnose as searchDiagnose } from "./searchTerm/shared.js";
+import { diagnose as harvestDiagnose } from "./searchTerm/r15.js";
+import { evaluate as R18, diagnose as placementDiagnose } from "./placement/r18.js";
+import { evaluate as R19 } from "./placement/r19.js";
+import { evaluate as R10 } from "./target/r10.js";
+import { evaluate as R11 } from "./target/r11.js";
+import { evaluate as R12 } from "./target/r12.js";
+import { evaluate as R13 } from "./target/r13.js";
+import { evaluate as R14 } from "./target/r14.js";
 import { evaluate as R01 } from "./campaign/r01.js";
 import { evaluate as R02 } from "./campaign/r02.js";
 import { evaluate as R03 } from "./campaign/r03.js";
@@ -9,7 +24,7 @@ import { evaluate as R06B } from "./campaign/r06b.js";
 import { evaluate as R07 } from "./campaign/r07.js";
 import { evaluate as R08 } from "./campaign/r08.js";
 import { evaluate as R09 } from "./campaign/r09.js";
-import type { RuleId, RuleGroup, RuleDefinition } from "../engine/types.js";
+import type { RuleId, RuleGroup, RuleDefinition, ObjectRef, RuleContext } from "../engine/types.js";
 import { G6_RULES } from "../guards/bid.js";
 const IDS: readonly RuleId[] = [
   "R01",
@@ -83,8 +98,16 @@ export const registry: readonly RuleDefinition[] = Object.freeze(
         ...(["R02", "R03", "R04", "R04B", "R10", "R14", "R18", "R21"].includes(id) ? ["MANAGE", "ALERT"] as const : []),
         ...(group(id) === "CAMPAIGN" && id !== "R01" ? ["PAUSED_AUTO"] as const : []),
       ]),
+      ...(["R16","R17"].includes(id) ? { diagnose: searchDiagnose } : id === "R15" ? { diagnose: harvestDiagnose } : {}),
+      ...(id === "R18" ? { diagnose: placementDiagnose } : {}),
       appliesG6: G6_RULES.includes(id),
-      evaluate: ({R01,R02,R03,R04,R04B,R05,R06,R06B,R07,R08,R09} as Partial<Record<RuleId, RuleDefinition["evaluate"]>>)[id] ?? (() => null),
+      evaluate: (ref: ObjectRef, ctx: RuleContext) => {
+        if (!ctx.state || !ctx.metrics) return null;
+        if (group(id) === "TARGET" && !ctx.state.targets[ref.id]) return null;
+        if (group(id) === "PLACEMENT" && !ctx.state.campaignMemory[ref.id]) return null;
+        if (group(id) === "SEARCHTERM" && (!ref.sourceTargetId || !ctx.state.campaigns[ref.campaignId!])) return null;
+        return (({R01,R02,R03,R04,R04B,R05,R06,R06B,R07,R08,R09,R10,R11,R12,R13,R14,R15,R16,R17,R18,R19,R20,R21,R21B} as Partial<Record<RuleId, RuleDefinition["evaluate"]>>)[id] ?? (() => null))(ref, ctx);
+      },
     }),
   ),
 );

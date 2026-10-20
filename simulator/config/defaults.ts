@@ -1,5 +1,8 @@
 import { usd, type Micros } from "../src/domain/money.js";
 export interface SimConfig {
+  readonly audit: { readonly level: "matched" | "all" };
+  readonly thresholds: { readonly r10r11Clicks: number; readonly hourlyClicks: number };
+  readonly hourlyAnalysisWeekday: number;
   readonly product: {
     readonly expCvr: number;
     readonly winCap: number;
@@ -38,11 +41,13 @@ export interface SimConfig {
   readonly every3DaysAnchor: string;
   readonly every3DaysAnchorMode: "campaign-created" | "global";
   readonly ambiguity: {
+    readonly placementWindow: "post14-min7";
+    readonly hourlyScope: "campaign" | "target";
+    readonly r14CountResetAfterFlag: boolean;
     /** Runs occur before traffic; include the change day. */ readonly changeDayCountsAsPost: boolean;
     readonly tagRulesGatedByCooldown: boolean;
     /** Step 1 detects conflicts; policies reserved for Step 4. */ readonly crossLevelBidPolicy:
       | "campaign-first"
-      | "target-first"
       | "error";
     /** Include hourly multipliers in the effective ToS cap. */ readonly tosCapIncludesHourly: boolean;
     /** Reset only the changed entity unless explicitly configured later. */ readonly windowResetScope:
@@ -59,6 +64,9 @@ export interface SimConfig {
   };
 }
 export const DEFAULT_CONFIG: SimConfig = Object.freeze({
+  audit: Object.freeze({ level: "all" as const }),
+  thresholds: Object.freeze({ r10r11Clicks: 15, hourlyClicks: 40 }),
+  hourlyAnalysisWeekday: 1,
   product: Object.freeze({
     expCvr: 0.1,
     winCap: 0.3,
@@ -98,9 +106,12 @@ export const DEFAULT_CONFIG: SimConfig = Object.freeze({
   // SPEC-AMBIGUITY: Campaign creation anchors tag checks unless global is explicitly selected.
   every3DaysAnchorMode: "campaign-created",
   ambiguity: Object.freeze({
+    placementWindow: "post14-min7" as const,
+    hourlyScope: "campaign" as const,
+    r14CountResetAfterFlag: true,
     changeDayCountsAsPost: true,
     tagRulesGatedByCooldown: false,
-    crossLevelBidPolicy: "error" as const,
+    crossLevelBidPolicy: "campaign-first" as const,
     tosCapIncludesHourly: true,
     windowResetScope: "entity" as const,
     // SPEC-AMBIGUITY: Restore exactly the saved tier, rather than estimating a new budget.

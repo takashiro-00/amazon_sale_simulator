@@ -55,7 +55,7 @@ export async function runCampaignLoop(options: {
         const campaign = { id: c.id, asin: c.asin, type: c.type, targetingKind: c.type === 'AUTO' ? 'AUTO' as const : 'KEYWORD' as const, status: c.status, name: c.name, dailyBudgetMicros: micros(Math.round(c.budget * 1e6)), topOfSearchPct: c.topOfSearchPct };
         state = { ...state, campaigns: { ...state.campaigns, [c.id]: campaign } };
         for (const t of c.targets) {
-            const entity = { id: t.id, campaignId: c.id, adGroupId: `${c.id}:group`, kind: t.kind, text: t.text, status: t.status, bidMicros: micros(Math.round(t.bid * 1e6)), ...(t.kind === 'KEYWORD' ? { matchType: 'EXACT' as const } : {}) };
+            const entity = { id: t.id, campaignId: c.id, adGroupId: `${c.id}:group`, kind: t.kind, text: t.text, status: t.status, bidMicros: micros(Math.round(t.bid * 1e6)), ...(t.kind === 'KEYWORD' ? { matchType: t.matchType ?? 'EXACT' as const } : {}) };
             state = { ...state, targets: { ...state.targets, [t.id]: createTargetMemory(entity.bidMicros, clock.now(), config) }, targetEntities: { ...state.targetEntities, [t.id]: entity } };
         }
     }
@@ -161,3 +161,5 @@ export async function runCampaignLoop(options: {
     }
     return { state, audit: audit.events, notifications, decisions, facts, timeline, portCalls: port.calls };
 }
+
+export { runAccountLoop, accountTimelineMarkdown } from './accountLoop.js';

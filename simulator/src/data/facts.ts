@@ -17,6 +17,7 @@ export interface MetricFact {
     readonly knownAt: Instant;
 }
 export interface FactQuery {
+    readonly dailyOnly?: boolean;
     readonly asOf: Instant;
     readonly entityRef?: string;
     readonly from?: MarketplaceDate;
@@ -101,6 +102,7 @@ export function queryFacts(facts: readonly MetricFact[] | FactIndex, q: FactQuer
     else
         candidates = facts;
     for (const f of candidates) {
+        if (q.dailyOnly && (f.hour !== undefined || f.placement !== undefined)) continue;
         if (Date.parse(f.knownAt) > cutoff)
             continue;
         if ((q.entityRef !== undefined && f.entityRef !== q.entityRef) ||
