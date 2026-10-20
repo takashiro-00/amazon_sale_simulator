@@ -1,0 +1,191 @@
+{
+  "seed": 42,
+  "marketplace": {
+    "id": "US",
+    "zone": "America/Los_Angeles"
+  },
+  "startDate": "2026-10-01",
+  "days": 100,
+  "products": [
+    {
+      "asin": "B001",
+      "priceUsd": 100,
+      "breakEvenAcos": 0.4,
+      "expectedCvr": 0.1
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "hourly",
+      "asin": "B001",
+      "name": "hourly",
+      "type": "MANUAL",
+      "budget": 5,
+      "status": "ENABLED",
+      "topOfSearchPct": 0,
+      "targets": [
+        {
+          "id": "weak",
+          "bid": 0.2,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "weak",
+          "trueCvr": 0.03,
+          "ctr": 0.08,
+          "clearingPrice": 0.05,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 100,
+          "hourlyTrafficCurve": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "weak",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        },
+        {
+          "id": "strong",
+          "bid": 0.2,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "strong",
+          "trueCvr": 0.4,
+          "ctr": 0.08,
+          "clearingPrice": 0.05,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 100,
+          "hourlyTrafficCurve": [
+            0,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "strong",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        },
+        {
+          "id": "normal",
+          "bid": 0.2,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "normal",
+          "trueCvr": 0.15,
+          "ctr": 0.08,
+          "clearingPrice": 0.05,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 600,
+          "hourlyTrafficCurve": [
+            0,
+            0,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456,
+            0.045454545454545456
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "normal",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        }
+      ]
+    }
+  ],
+  "attribution": {
+    "lagDistribution": {
+      "0": 1
+    },
+    "returnLagDays": 7
+  },
+  "returnRate": 0,
+  "hourlyNoise": 0,
+  "overspendTolerance": 0,
+  "couponZeroSalesRate": 0,
+  "events": [
+    {
+      "type": "manualEdit",
+      "at": "2026-11-30T08:00:00.000Z",
+      "entityId": "hourly",
+      "field": "budget",
+      "value": 25
+    }
+  ],
+  "apiFault": {}
+}

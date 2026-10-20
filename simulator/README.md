@@ -511,7 +511,7 @@ npm test
 npm run edge -- --out out/edge
 npm run mc -- scenarios/full-account.json --seeds 100 --workers auto --out out/mc/full-account
 npm run mc -- scenarios/edge/attribution-storm-account.json --seeds 100 --compare 'ambiguity.changeDayCountsAsPost=false' --out out/mc/storm
-npm run report -- --edge out/edge --mc out/mc/full-account --mc out/mc/storm --out out/report
+npm run report -- --edge out/edge --mc out/mc/full-account --mc out/mc/storm --mc out/mc/marginal --out out/report
 ```
 
 Report HTML/Markdown sinh từ dữ liệu đã lưu, sort ổn định, không dùng thời gian hệ thống. HTML tự chứa, chart SVG inline, light/dark theo `prefers-color-scheme`, không URL/script ngoài. README Bước 3–4 là nguồn các phát hiện lịch/reset/harvest; report bổ sung evidence edge và Monte Carlo, chỉ đề xuất sửa spec.
@@ -563,3 +563,65 @@ Compare làm profit p50 giảm **$602,937428**, flip-flops p50 về 0/0; có m�
 - **A5/A6:** **5.020 target-hour** cạn budget/thiếu impressions; R20 giảm giờ thiếu dữ liệu **0**. Noise 10% gây tổng lệch spend hourly so với daily **$122,960463**; 624 bản phân tích factor thật, R20/R21 đổi factor **0/0** trong fixture này. Đề xuất spec quy định riêng exposure/budget-capped trước khi học hệ số giờ.
 - **C2:** ba target đứng im >30 ngày. **D2:** một R07 có đủ 14 ngày theo dõi, ACoS sau đó **19,375% < T_win 28%**. Đề xuất cửa sổ/điều kiện phục hồi rõ ràng để đánh giá vòng xoáy chết và baseline may mắn.
 - **E6:** nguồn có **11 đơn/$14,230770** trước harvest, **4 đơn/$28,187445** sau harvest; R06 ngày 8. Đề xuất theo dõi đồng thời ASIN và campaign, xét grace sau harvest. Không suy ra quan hệ nhân quả chỉ từ before/after này.
+
+
+## Bước 5b — đối chứng đo lường
+
+Chạy từ `simulator/`, không thêm dependency, không sửa rule hoặc kỳ vọng test cũ:
+
+```sh
+npm run typecheck
+npm test
+npm run edge -- --out out/edge
+npm run mc -- scenarios/marginal-account.json --seeds 100 --workers auto --out out/mc/marginal
+npm run report -- --edge out/edge --mc out/mc/full-account --mc out/mc/storm --mc out/mc/marginal --out out/report
+```
+
+Nếu thiếu bộ MC cũ, chạy lại hai lệnh full-account và storm ở mục Bước 5 phía trên trước khi chạy report. Bộ cũ còn nguyên trong lần chạy 5b này. Report đọc thêm hai file edge `premature-positive.json`, `hourly-signal.json` và bộ MC `marginal`.
+
+### Đối chứng premature
+
+`scenarios/edge/premature-positive.json`: một Exact target, CVR thật 4%, bid $0.80, CTR 8%, 1.800 impressions/ngày trước auction/budget, giá $30, BE 40%. Lag 3/5/7 ngày có trọng số 10%/20%/70%; 18 ngày, seed 1. Chọn seed có đơn thật đến trễ để làm đối chứng dương xác định, không ước lượng tỷ lệ premature của quần thể. Không dùng fact nhân tạo, ScriptedMarket hay sửa đơn sau khi chạy.
+
+Qua `runAccountLoop` rồi `measureRun`: **premature R12=1, R06=1, tổng=2**, premature pause=1. Giữ nguyên scenario/seed, chỉ thay lag bằng `{ "0": 1 }`: **premature tổng=0**. Cửa sổ và state giữ tại quyết định gốc; knowledge time của lần đánh giá lại nằm sau khi đơn chín:
+
+| Rule | Ngày PT | Cửa sổ gốc (bao gồm hai đầu) | Click | Spend | Đơn/sales lúc quyết định | Đơn/sales đã chín |
+| --- | --- | --- | --- | --- | --- | --- |
+| R12 | 2026-10-05 | 01–03/10 | 23 | $13.960293 | 0 / $0 | 3 / $90 |
+| R06 | 2026-10-07 | 01–05/10 | 40 | $23.201352 | 0 / $0 | 4 / $120 |
+
+ACoS gốc vô cực; sau chín lần lượt 15.5114% và 19.3345%. Có đơn nên cả hai rule 0 đơn không còn khớp. `out/edge/premature-positive.json` lưu metric dương/âm và cửa sổ/giá trị này.
+
+### Marginal 100 seed
+
+`scenarios/marginal-account.json`: 45 ngày, ba campaign Manual, mỗi campaign hai Exact target, 1.000 impressions/target/ngày, CTR 8%, attribution tức thì, không chaos API. Giá $30, BE 40%, Exp_CVR 10% dẫn xuất qua `deriveThresholds`: T_win=28%, T_ok=36%, T_bad=44%. Bid/CVR thật của ba nhóm lần lượt $0.50/(5%,4.5%), ($0.55,$0.50)/(4%,3.8%), ($0.60,$0.55)/(3.5%,3.2%). Với CPC kỳ vọng 0.775×bid, ACoS cơ sở trước tác động rule lần lượt khoảng 25.83–28.70%, 33.99–35.52%, 44.29–44.40%, nằm sát ba ngưỡng. Rule thay bid, budget và pause sẽ làm ACoS cả run khác ACoS cơ sở này.
+
+Lệnh 100 seed, auto=8 worker, hoàn tất trong **100.937 giây** (durationMs trong summary). Các giá trị tiền là USD; flip-flops là số lần đảo chiều/30 ngày, cộng trên account:
+
+| Metric | p5 | p50 | p95 |
+| --- | --- | --- | --- |
+| timeToTier.to12 (ngày) | 12 | 21 | 39.8 |
+| timeToTier.to25 (ngày) | null | null | null |
+| acos | 23.711834% | 26.358676% | 30.965622% |
+| profit | 181.808135 | 436.574816 | 719.042877 |
+| spend | 488.788992 | 848.990216 | 1185.309382 |
+| flipFlops.budget | 2 | 4.666667 | 8 |
+| flipFlops.bid | 3.933333 | 10 | 16.066667 |
+| wastedSpend | 0 | 96.659040 | 434.155417 |
+| prematureTotal | 0 | 0 | 0 |
+
+89/100 seed đạt $12; percentile to12 chỉ dùng seed đạt tier theo policy hiện có. **0/100 đạt $25** trong 45 ngày, nên summary không có cột số to25; bảng biểu diễn bằng null, không thay bằng 0. Test nhanh chạy 8 seed ×18 ngày, xác nhận tập `(ruleId, objectRef, ngày)` khác nhau và ít nhất một phân phối metric có p5 khác p95.
+
+### Hourly signal và boundary
+
+`scenarios/edge/hourly-signal.json`: seed 42, 100 ngày, một campaign với ba target có đường traffic khác nhau: target yếu CVR 3% chỉ ở giờ 00, target mạnh CVR 40% chỉ ở giờ 01, target nền CVR 15% chia đều giờ 02–23. CTR 8%, impressions/ngày tương ứng 100/100/600; giá $100 để các giờ vẫn sinh đơn và campaign không bị pause bởi hiệu quả kinh tế. Không thêm tham số hourly CVR vào market model: dùng mixture target theo giờ ở campaign scope hiện có.
+
+R01 vẫn bắt đầu budget $5. Để tách tín hiệu giờ khỏi budget cap, fixture có console edit budget $25 lúc 2026-11-30T08:00Z; reconciliation thật tiếp nhận edit. Cửa sổ kiểm chứng cuối **10/12/2026–06/01/2027** có đủ 28 ngày cho cả 24 giờ, ít nhất **48 click/giờ**, **0 giờ budget-capped**. Giai đoạn khởi động trước cửa sổ này có thể cạn budget; không dùng nó làm bằng chứng đủ volume. Giờ 00 có 5/170 đơn/click (2.94%), giờ 01 có 94/209 (44.98%).
+
+Qua `runAccountLoop`: **R20 giảm factor 34 lần, R21 tăng factor 33 lần, R21B có 626 batch write**. R20/R21 là số thay đổi factor target×giờ trong `hourlyAnalyses`, không phải số daily Decision (runner gọi chung `analyzeHours`). R21B đếm port call `updateTargets` có key R21B; mọi target của fixture dùng cùng endpoint keyword. Có đúng **626 boundary đổi bid**, **0 key boundary trùng**, **0 write tại boundary không đổi bid**. `hourlyBoundaries` ghi bid acknowledged trước/sau từng boundary để test đối chiếu port call, kể cả boundary no-op. Test DST/idempotency cũ vẫn giữ nguyên.
+
+### Phát hiện Bước 5b
+
+Không phát hiện bug thật trong `maturePremature`, R20/R21 hay submitBoundary; **không sửa rule/metric để đạt đối chứng**. Premature cũ toàn 0 và hourly cũ 0/0 phản ánh fixture chưa có bằng chứng dương. Test mới trong `test/measurement-controls.test.ts` chạy market và account loop thật, không gọi evaluator trực tiếp. Thêm helper đo cửa sổ trong `src/edge/controls.ts`, telemetry boundary trong runner, và nối hai đối chứng vào edge suite. Dùng policy ambiguity hiện có (D-2, campaign hourly scope, first-campaign tier, excludes unreached tiers); không đưa vào lựa chọn semantics mới.
+
+Xác minh: `npm run typecheck` pass; `npm test`: **298/298 test, 37 file, 27.12 giây wall time** (test time cộng các worker 67.58 giây). 295 test cũ giữ nguyên kỳ vọng, thêm 3 test. Không commit/push.

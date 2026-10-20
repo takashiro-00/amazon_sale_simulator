@@ -30,6 +30,7 @@ export async function runAccountLoop(options:{scenario?:Scenario;scriptedMarket?
  const market=options.scriptedMarket??new MarketDriver(s,new MemoryFactSink());
  const inner=new InMemoryFakePort(),port=new FaultyFakePort(inner,clock,s.seed,()=>eventContext(s,clock.now()).apiFault);
  const hourlyAnalyses:HourlyAnalysisRecord[]=[];
+ const hourlyBoundaries:{at:string;changes:{targetId:string;before:number|undefined;after:number}[]}[]=[];
  const facts:MetricFact[]=[],index=new FactIndex(),audit=new AuditLog(),decisions:Decision[]=[],notifications:NotificationLog[]=[],timeline:AccountTimeline[]=[];
  let state:EngineState={campaigns:{},campaignMemory:{},targets:{},targetEntities:{},negatives:{},pendingHarvests:[],verifiedHarvests:[]};
  const truth=new Map<string,ScenarioTarget>(),sent=new Map<string,number>(),boundaries=new Set<string>(),runDates=new Set<string>(),pendingEnable=new Set<string>();
@@ -78,13 +79,15 @@ export async function runAccountLoop(options:{scenario?:Scenario;scriptedMarket?
     timeline.push({day:calendarDaysBetween(s.startDate,today),date:today,campaignId:cid,ruleId:d.ruleId,...(e?{targetId:e.id,bid:d.after.targets[e.id]!.baseBidMicros/1e6}:{}),...(d.objectRef.query?{query:d.objectRef.query}:{}),tos:campaign.topOfSearchPct,status:e?.status??campaign.status,budget:campaign.dailyBudgetMicros/1e6,tag:d.after.campaignMemory[cid]?.tag??'NORMAL'});
    }
   }
+  const beforeBoundary=new Map(sent);
   await submitBoundary(iso,state,thresholds,port,sent,boundaries,config,r=>{waitSeconds+=r.waitSeconds;for(const id of r.acked)acknowledgedAt[`target:${id}`]=iso;for(const id of r.failures)notifications.push({at:iso,campaignId:state.targetEntities[id]!.campaignId,type:'API_WRITE_FAILED',details:{ruleId:'R21B',targetId:id}});});
+  hourlyBoundaries.push({at:iso,changes:[...sent].filter(([id,bid])=>beforeBoundary.get(id)!==bid).map(([targetId,after])=>({targetId,before:beforeBoundary.get(targetId),after}))});
   assertTargetInvariants(state,thresholds,decisions,iso,config);
   for(const [id,bid] of sent){const e=state.targetEntities[id]!;if(e.status==='PAUSED')continue;const t=thresholds[id]!,tos=state.campaigns[e.campaignId]!.topOfSearchPct;if(bid<t.Bid_min||bid>t.Bid_max||bid*(1+tos/100)>1.5*t.Bid_max+1e-6)throw new Error('ACKNOWLEDGED_BID_INVARIANT');}
   facts.push(...market.step(iso,await amazonView()).facts);previous=iso;
  }
  const targets=Object.entries(state.targetEntities).map(([id,e])=>({id,text:e.text,initialBid:initialBids[id]!,finalBid:state.targets[id]!.baseBidMicros/1e6,status:e.status,decay:state.targets[id]!.baseBidMicros/state.targets[id]!.anchorBidMicros-1,stalledDays:calendarDaysBetween((state.targets[id]!.lastBidChangeAt??state.targets[id]!.createdAt??start.toUTC().toISO()!).slice(0,10),end.toISODate()!)}));
  const matureFacts=market instanceof MarketDriver?[...facts,...market.flush(end.plus({days:15}).toUTC().toISO()!)]:[...facts];
- return {state,facts,matureFacts,hourlyAnalyses,truth:market instanceof MarketDriver?market.truth:[],waitSeconds,audit:audit.events,decisions,notifications,timeline,targets,portCalls:port.calls};
+ return {state,facts,matureFacts,hourlyAnalyses,hourlyBoundaries,truth:market instanceof MarketDriver?market.truth:[],waitSeconds,audit:audit.events,decisions,notifications,timeline,targets,portCalls:port.calls};
 }
 export function accountTimelineMarkdown(result:Awaited<ReturnType<typeof runAccountLoop>>){return '| day | date | campaign | target | search term | rule | base bid | ToS | status |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n'+result.timeline.map(t=>`| ${t.day} | ${t.date} | ${t.campaignId} | ${t.targetId??''} | ${t.query??''} | ${t.ruleId} | ${t.bid??''} | ${t.tos}% | ${t.status} |`).join('\n')+'\n\n## Targets\n\n| target | initial bid | final bid | status | decay vs anchor | stalled days |\n| --- | --- | --- | --- | --- | --- |\n'+result.targets.map(t=>`| ${t.id} | $${t.initialBid.toFixed(2)} | $${t.finalBid.toFixed(2)} | ${t.status} | ${(t.decay*100).toFixed(1)}% | ${t.stalledDays} |`).join('\n')+'\n';}
