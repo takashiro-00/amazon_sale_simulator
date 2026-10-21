@@ -1,5 +1,8 @@
 import { usd, type Micros } from "../src/domain/money.js";
 export interface SimConfig {
+  readonly v32: { readonly zeroOrderLagDays: number; readonly r06CalendarGuard: boolean; readonly r08Daily: boolean; readonly postHarvestGraceDays: number; readonly hysteresis: boolean; readonly hourlyExcludeCapped: boolean };
+  readonly v32Hysteresis: { readonly bidUp: number; readonly bidDown: number; readonly budgetUp: number; readonly budgetWinUp: number; readonly budgetDown: number };
+
   readonly api: { readonly maxAttempts: number; readonly staleReadGraceMinutes: number };
   readonly audit: { readonly level: "matched" | "all" };
   readonly thresholds: { readonly r10r11Clicks: number; readonly hourlyClicks: number };
@@ -72,6 +75,8 @@ export interface SimConfig {
   };
 }
 export const DEFAULT_CONFIG: SimConfig = Object.freeze({
+  v32: Object.freeze({ zeroOrderLagDays: 2, r06CalendarGuard: false, r08Daily: false, postHarvestGraceDays: 0, hysteresis: false, hourlyExcludeCapped: false }),
+  v32Hysteresis: Object.freeze({ bidUp: .9, bidDown: 1.1, budgetUp: .95, budgetWinUp: .95, budgetDown: 1.05 }),
   api: Object.freeze({ maxAttempts: 4, staleReadGraceMinutes: 30 }),
   audit: Object.freeze({ level: "all" as const }),
   thresholds: Object.freeze({ r10r11Clicks: 15, hourlyClicks: 40 }),

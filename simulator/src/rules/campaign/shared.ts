@@ -1,3 +1,4 @@
+import { zeroOrders } from '../zeroOrders.js';
 import type { RuleContext, Proposal, NotificationLog } from '../../engine/types.js';
 import type { CampaignMemory, CampaignTag } from '../../domain/state.js';
 import { resolveWindow } from '../../data/windows.js';
@@ -33,3 +34,5 @@ export function propose(id: string, ctx: RuleContext, patch: Partial<CampaignMem
 }
 // SPEC-AMBIGUITY: Any terminal pause ends an outstanding R06B wait to preserve the tag/phase invariant.
 export function pause(id: string, ctx: RuleContext, reason: 'R06' | 'R06B') { return propose(id, ctx, { preTagTierIndex: null, requiresUserConfirmToEnable: true, pausedAutoReason: reason, r06bPhase: 'DONE' }, 0, 'PAUSED_AUTO', undefined, reason === 'R06' ? 'R06_PAUSED' : 'R06B_PAUSED'); }
+
+export function zero(id:string,ctx:RuleContext,orders:number,days:number,post=false,minRipeDays=days){return zeroOrders(id,ctx,orders,{kind:post?'post':'rolling',days,minRipeDays},ctx.state.campaignMemory[id]!.windowStartAt);}

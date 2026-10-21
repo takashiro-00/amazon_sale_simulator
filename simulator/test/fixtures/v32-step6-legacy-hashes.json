@@ -1,0 +1,218 @@
+[
+  {
+    "name": "api-chaos",
+    "checks": {
+      "audit": "7022bc2586caed71a5373c24168dde8583153bd50e9e38cbde66ff014b7ecfa2",
+      "decisions": "40e95fd13a03751450bab62884b6885dbb32c3ff19161e67f96faaa18da64e63",
+      "facts": "15ff37f290920e857516680896ebdf1ac5bda4041ae3c7bf5768d2561d78acef",
+      "hourlyAnalyses": "c1d8b03851d10c682472d771ca97d76f077537ef8ab499c91e708e2b249fb0da",
+      "hourlyBoundaries": "5dced72e10a6c0629a241f5453208279dfd54b9f403913aeb80adf00f7919821",
+      "matureFacts": "f9a537cd64418d233a00654b7deb128605cbd21cb3f135eb492b10dcb2bccbb9",
+      "notifications": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "portCalls": "aa878a88861416434bd70d5d3fdf60b59a2ead83c1e6164f762b693e280f02a1",
+      "state": "f3a5ec8d3546e5dd40d6d3db39a14dba02290f60c45855f5175c863197134d2f",
+      "targets": "aca1e8e296da889002701286c19282d60293db22d1cced2050a4237cf5e6466a",
+      "timeline": "4a1156330b919a350742d497a2eca3fa2e52d18ad0a4bf26eaa95b562186b420",
+      "truth": "a8d722aec6ed155606e742f87070ef8300fd22b2786056d3417d398e28ae7eab",
+      "waitSeconds": "7b69759630f869f2723875f873935fed29d2d12b10ef763c1c33b8e0004cb405"
+    }
+  },
+  {
+    "name": "attribution-storm",
+    "checks": {
+      "audit": "478f60d7d15dad08ee7ae918071d01a238a9207dda7b84d5a782e9f141fe9218",
+      "decisions": "a119320f5f04abf4587c21cbe8120848083d2ec7ace3e45c8b82a8992c0d42ef",
+      "facts": "68789c7ea89ba99faa4353e2de6daae4774fcd48f94f0e410af0f32cdeeb0b9f",
+      "hourlyAnalyses": "c8854ebb72f1e83541e3248fa0a6c3b5e396ac7659f59dbbc53a4f54f959200e",
+      "hourlyBoundaries": "5dced72e10a6c0629a241f5453208279dfd54b9f403913aeb80adf00f7919821",
+      "matureFacts": "995ac3414632229d4f09c6ec11f267129460751f7601e78bb74fd3e8bf500f98",
+      "notifications": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "portCalls": "44ba9cc679fc73381a31bbc36a1834d41d8f05f128d3a2dbe7b5520dceea35f3",
+      "state": "212cc0936ebcc7b47e9bb36ad91e537e2767a009f345f61db85efd93442a5742",
+      "targets": "aca1e8e296da889002701286c19282d60293db22d1cced2050a4237cf5e6466a",
+      "timeline": "4a1156330b919a350742d497a2eca3fa2e52d18ad0a4bf26eaa95b562186b420",
+      "truth": "dfe7d0eb111a98443465604aee7fbd49b438e8c4f9ad35cf6d3ce155f04791e9",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "budget-capped",
+    "checks": {
+      "audit": "faa19fdf773a38e7bf4556c199e98aeba8b9cc71e47b5d9a71bc9805ce7507d1",
+      "decisions": "b2a9a4e89d690c3aafa0688b095e5aab453bcf7fe01dc4d580465482aa7fc067",
+      "facts": "15ff37f290920e857516680896ebdf1ac5bda4041ae3c7bf5768d2561d78acef",
+      "hourlyAnalyses": "c1d8b03851d10c682472d771ca97d76f077537ef8ab499c91e708e2b249fb0da",
+      "hourlyBoundaries": "5dced72e10a6c0629a241f5453208279dfd54b9f403913aeb80adf00f7919821",
+      "matureFacts": "f9a537cd64418d233a00654b7deb128605cbd21cb3f135eb492b10dcb2bccbb9",
+      "notifications": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "portCalls": "44ba9cc679fc73381a31bbc36a1834d41d8f05f128d3a2dbe7b5520dceea35f3",
+      "state": "f3a5ec8d3546e5dd40d6d3db39a14dba02290f60c45855f5175c863197134d2f",
+      "targets": "aca1e8e296da889002701286c19282d60293db22d1cced2050a4237cf5e6466a",
+      "timeline": "4a1156330b919a350742d497a2eca3fa2e52d18ad0a4bf26eaa95b562186b420",
+      "truth": "a8d722aec6ed155606e742f87070ef8300fd22b2786056d3417d398e28ae7eab",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "dst-fallback",
+    "checks": {
+      "audit": "8f3561145d3b8e2f0efc64b14c7185ac99850d5463d67b63a2093757d4fa03d4",
+      "decisions": "a7c8125d30ce5df740d9a8d32e775b24ec694a3e8932f12f758fad78ab772d7a",
+      "facts": "cb1bdf2b6c326e7dcd9ea3182ea7b7619948abb843d3bf265a8c7a2784bfea64",
+      "hourlyAnalyses": "14580d54ed297193a3e68b430e1794590d80ba12c80f02fce9ca2cd9b133a336",
+      "hourlyBoundaries": "7f86c26fc1f8541a5d803f5fd3cb1bb63f55ed2ebd0f3f532011ba58e67b9e69",
+      "matureFacts": "700b719a3e8e832e53d45fb048fd4dd9e4e6070b776de08acf5a9cdb30306350",
+      "notifications": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "portCalls": "40123a22cae0ec581af30a76148f600172f54762279afc5921565c064b51b8d4",
+      "state": "56df6ed06cc9017bb92c3da15fe131b0a17b08c84e00205163b1c842aa522544",
+      "targets": "578b5b8f5b890e9f850a678c62cba717dd76cc84f44038b98ffeda775a91527c",
+      "timeline": "85733f31f394465951a067e02f6b6033cc2f6b0341fb17e3484c5a5b88fb5ae9",
+      "truth": "c5ae466abd29347ce81feb92065f68897f869aaecf5937dedcc740755ec27a8b",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "full-account",
+    "checks": {
+      "audit": "eac14cea133f1d505fa90b9c12cf02502dc21a6998c488b0c8e1b6b90126be83",
+      "decisions": "8cfacbed3271741ed65330b60121b42aedafc42fbed51a0bb805a2d17b828005",
+      "facts": "a6884d21799b0014b2333d6eac347f5c8f34802d33f5d4856108ecf06b3518c6",
+      "hourlyAnalyses": "f62f83e850e7d28631b26b37ef8db97cd972f2faa75b153bd2623913eea7264f",
+      "hourlyBoundaries": "d34bbbb110a5751f074c84197012ed6ade6945cb80c4f25581ee0877e716497f",
+      "matureFacts": "d3ca451bcc350dab85b247859dda9de1d3d41667cc46818c911651b1dd804962",
+      "notifications": "ce51533380dc5d5944207f417d95b71036dc1b80de2a50b9d52d65941a131e03",
+      "portCalls": "86547fb8a146ba9c7eb7c2df43758d8bbd8343020d4fa0eea294b21582ad5090",
+      "state": "7730380974cdb2b67d22ccdb34046e27120f33b26aecd9fa6b13d9cdfeb34d95",
+      "targets": "761e95762ecbb5da63431085494028612f444ba616fe33c40c6f385e9620f7e8",
+      "timeline": "6b6daa9b978d91878cda377dbdb08225c50ea9d98b352073ef2715f698d0a1a5",
+      "truth": "c0c2a0a9aa9eb1ff4911510f2654612164d6cc35ccd896d7e26c4a696dcf1571",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "golden-winner",
+    "checks": {
+      "audit": "08458e069d548effda605bf86852da6d186b34f50e1b5d13c0c22245ade1a902",
+      "decisions": "0f44904d8386a1fb7e0b327b0ed75ea410e0e86b324efcccb19d0c0e9e293f71",
+      "facts": "7553ec435d4b9e82be60821578f51567970a323e9bd54fb2f58d239e26540567",
+      "hourlyAnalyses": "cef59911428dc6e7c1fd1a2f239bffeec7d56de79db3e7c8b0bf4e92bfbc40d4",
+      "hourlyBoundaries": "d5dc204b115d4b45eaede047715ddb60e1c95107751a61e5a4d1e86c2e6b0f76",
+      "matureFacts": "7dc226e9e3f1fb3fd1127993b713f35b2ba11b14568a4935f25c5b69053ca7ba",
+      "notifications": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "portCalls": "1c34c09b611ad04cc162903b4e80ffae798a34261e25ea49a0800c234612bcad",
+      "state": "6a6aea545c95cdce24152f562a91fc31f2696a07830f29c4b703ed5e947ef6c5",
+      "targets": "27276eb33a49d5615ceb011552ddfc0d7f14c56278d1bc47fce5752cccf8161b",
+      "timeline": "7b2db0eb0bb31196f2d9a8b3447e45e1e2211154c3278c2c9e435a95c238d31b",
+      "truth": "5b93ac1aadaabb772ba6702ddb55bba34a1c96a926f83ccb693ace3adbf2101e",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "marginal-account",
+    "checks": {
+      "audit": "c7c6745857d48a096311e5c88d97e7e270a2faabe0b5420e6d2da2a3db56c11f",
+      "decisions": "dba95a3bc2c17839975ab2569b5abb500fbdbae7e16764fdfe9311ce036e6c80",
+      "facts": "d02bf9198538489cd3f57e45b90360cd445bddb11149e51020504e38a849bff7",
+      "hourlyAnalyses": "7b31af155ba86d26341c3c6667971404d4cf96059205e9d465eec183ea52a556",
+      "hourlyBoundaries": "c9b1d2cd428f31f3473c0d592d4dc51c219fb903842accea354ed74261122129",
+      "matureFacts": "e7584523f2064f857ea94f53f442fc427b018719a6f6d14c0d3fe8e6f6873e9d",
+      "notifications": "ec83f310ed7a176f1c0d9b0859e5f9feb0c9c5c61001d7b4d1202520bf04d6df",
+      "portCalls": "b8fe44efd93e1e8b249b6aada48f3fe9e1d4a57aab56c0cafa7d67d67f565f6f",
+      "state": "3484d650a300d46d935258e07c3dfcb468e4aa459a1efe822d1a3044286b3291",
+      "targets": "ef0912f8ac38e06981f033ad9aaa429cbbcd758914bb8e9b90516a2309a58f1a",
+      "timeline": "4160a5f7a6d3fcd3fad6523d9e3af339c5dfa5e5be25fb7fe360335f54ca62f2",
+      "truth": "284b8dc82de77db18e3311b3c3b37e81fb5677f56a1239c163da7e1e0aa96266",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "zero-order",
+    "checks": {
+      "audit": "5b35838dab5e6d68656ef4231a1f09a9849d3331f73b04684d4837e9141d2727",
+      "decisions": "0b8be31fd5bd255a1b609c44e7af4204e408c64b9e892dc57244be61edd18762",
+      "facts": "bb4d3cf9d8cab5a524feeb0cab9ce38b2d806b17026c1e4914ce29ed495b6044",
+      "hourlyAnalyses": "288103b71f3802085c906531325d679d851739af415a9bdf35ff4b74cd44237c",
+      "hourlyBoundaries": "5dced72e10a6c0629a241f5453208279dfd54b9f403913aeb80adf00f7919821",
+      "matureFacts": "ec9eca943b42ef8dbb14599707449cf4bc50d0209fdd78cfff074c1758f6f521",
+      "notifications": "c83ee0e5376f4b88c35c265df48c387daee4f98c8a80e6827d575e9e74c7ef77",
+      "portCalls": "6c2b2e6754805d1bacf18c2f79dcad6de3419d92664f4b03e865be12a71719a9",
+      "state": "a06cb106a0c5f5b991ba2d78c5440dbe87e82e89935c3ca61f4805f53fa0a0c3",
+      "targets": "d6e786727a3e2ee797f5ebca9514338c76c937bb1b22f2ef2e8be88f64a8a6fd",
+      "timeline": "34c2c3b047b9998afaa2a51fa3daecc1c89dbf9afd5855b2876400ce453a9fdc",
+      "truth": "e23fae81995bd707d7af18b6c9fcd3d80e4ee20ab0927e9059637bfdfc76676d",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "edge/attribution-storm-account",
+    "checks": {
+      "audit": "e7a76800cdf05e7411e833e1729266a954f0403ec554aefb6427d5ac80b8a483",
+      "decisions": "8583c35e54fb05eb4b8f77bd3be708832b70a54686f176af102214c35dafa3d6",
+      "facts": "eebc668a5a42158f4a456a35c4b4f8c73e7b94945d0f8665f89e0cb38cd403f1",
+      "hourlyAnalyses": "2cc4034ec4cea14ea59629371c314253677e75d5ccc420338c50af4b6c494121",
+      "hourlyBoundaries": "d34bbbb110a5751f074c84197012ed6ade6945cb80c4f25581ee0877e716497f",
+      "matureFacts": "b34a159be348e6bb9b060226d815f06bdab994bd86a0840e82de713a98984b7c",
+      "notifications": "ce51533380dc5d5944207f417d95b71036dc1b80de2a50b9d52d65941a131e03",
+      "portCalls": "86547fb8a146ba9c7eb7c2df43758d8bbd8343020d4fa0eea294b21582ad5090",
+      "state": "23570e07588f1cec4510861a016c39fe9f46894675050f8c3a23da916f222a18",
+      "targets": "761e95762ecbb5da63431085494028612f444ba616fe33c40c6f385e9620f7e8",
+      "timeline": "6b6daa9b978d91878cda377dbdb08225c50ea9d98b352073ef2715f698d0a1a5",
+      "truth": "882eb978b8a8e78b7ceda63d4cfb73da0fa2eba65b7d172bb672b6d658860d08",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "edge/chaos-account",
+    "checks": {
+      "audit": "cc9d89c185a978d40fb1a76725e35c2e5ed51c6a84ccf56c758a3c07bc6a78a5",
+      "decisions": "934bcfe02b0ebc07b0bac39d41d9585a178bc1adc93b2d58d58158b1cbd684d7",
+      "facts": "5e5862a3eba1b3fac261c611fdea994f81b034717187319ba8418091ed1b2b69",
+      "hourlyAnalyses": "5b1dbfe0e97476f9f146858ad8915d840d64f63c7d95c5f47dc1729498f34963",
+      "hourlyBoundaries": "8045cf467f95a487b2627e2f2f7198343dd4622f15d987421f9bb6d3a8cf97f9",
+      "matureFacts": "958ebbf44783e4fcec0638e884ad444b6fc909f3f96c6b87cfd2c5d0b0f93304",
+      "notifications": "b8481f6151d0e4691610758b75b2a48dc095b3c876694dfbb14a8ae058c6d5c4",
+      "portCalls": "2954252ac120fec5f5b20b13dc449f5e0cd6ad7bafa72682f9878994fff98be7",
+      "state": "c3816e65a6edfd10542720aadfcc5eed0d908ede431d406109bceecbe11f2e2e",
+      "targets": "e6ff9509fd01ab5e392261705959c26d1b3a5ecfc117d1a9930c01441f973076",
+      "timeline": "ea55c01f60aecec29931689e506a285b7218e09ea439b1fa28ea647a2ff4ec02",
+      "truth": "2b2b12d7c5e0e0895d6842ea45c42d3019e9673f2af60c7740c4709ad0b4359e",
+      "waitSeconds": "5316ca1c5ddca8e6ceccfce58f3b8540e540ee22f6180fb89492904051b3d531"
+    }
+  },
+  {
+    "name": "edge/hourly-signal",
+    "checks": {
+      "audit": "1891a6333e263e13d4cc021a5e6758d519f3aa1e3ac37c8dd289c0a011768827",
+      "decisions": "10da2b7abe56699569d60b1ea48871a355ceb860e5376f745e400af385d5c1b4",
+      "facts": "7b20f15d2ef4b235345394a73cc14f274575b18530cbb1a68e76d046f12aba83",
+      "hourlyAnalyses": "ee7dba56f8b361b860fb100ce1068c5eae6df0faad17e42b245d1da913ed59ad",
+      "hourlyBoundaries": "e2adca0873a8d241434a796cc8faecdcbc5313c1ab1754b6c5056af82e0b1139",
+      "matureFacts": "9b17a44c7843cc11ce4b09177b6b90e2994c0a823355ca1624dc63307a68ef82",
+      "notifications": "64b6c2512614e4ddae90eb39177a471a395201189c387d29b74bd918913757ed",
+      "portCalls": "bce56791ca21650fa163a7c0e36d87cb5fa5516bbf9af4f709eeedf30b606edf",
+      "state": "c7011b2ce62f34700d715a26e96c5bf4bda6fabc248151da3b642949b3dd8ca3",
+      "targets": "4e42246071b5513b69fc29dff300ae0b993d9b4e1f92fc4a5ca22cd8da00f809",
+      "timeline": "5c423149c25d80143625710775ef3da2df468843ecddae4d2814ea9772925c0a",
+      "truth": "0d9a9029ba99a57c4829172f1c9844c7be1172e7a1e7bdbb94ab0adc909c4742",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  },
+  {
+    "name": "edge/premature-positive",
+    "checks": {
+      "audit": "7a6dd577b9b19396cd53a97c10eb17ed318da9803ccdb3afa6e44dc30550158c",
+      "decisions": "6413028bbb5ebb3138a04665dfbfe74ee666c0b5afba6b05fed751b0987fa385",
+      "facts": "7b0e113d8e08d94a92b963f6485bc4fef2123f79fa0289c61bbf6da2f31a84da",
+      "hourlyAnalyses": "59f0fb8978e09862776a75f2f98ab69af746d9ad1738e37977136a7d5d32cea4",
+      "hourlyBoundaries": "c9d6f27ee908c1843fb6ec49f3e075da7558a244ff79cc4126b3e708822972c8",
+      "matureFacts": "4b2cd41d81a110b8458f2efe9d5e0a175191d013ad6e205e936868cbdba954ff",
+      "notifications": "4cdc9295175cd749ba249c84812d818223b63be0475436cbfcec24575fb29de6",
+      "portCalls": "e47f1a0e236e89c04946efec4735633698fa033b56ed389edb799d17a61a9408",
+      "state": "51c8e4cbec54cb34217c53e2049ed9126bf5d652c178cac2da13bd39029951b3",
+      "targets": "dce9bb10680b61f775da20c6fd6e00656b33f95843e2929563486c001b742da9",
+      "timeline": "47785cbf02a480b083cc1e6799114f8a567feaf56169810ce18c51b73dd3699e",
+      "truth": "e906c2980e3935d7bbf7532f87540a3202906741681c89d1a7af236e7aaf2909",
+      "waitSeconds": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+    }
+  }
+]

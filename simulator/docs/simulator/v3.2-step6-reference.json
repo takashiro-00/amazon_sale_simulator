@@ -1,0 +1,157 @@
+{
+  "note": "Historical Step 6 reference. Only P5 profit/flipFlops and historical verdicts are reused; no premature values are used for new verdicts.",
+  "sources": {
+    "out/v32/verdicts.json": "102b5b8b5ccfe5678b4aff0f6ce7d18e8ad15772c4b891df7b7c1236e444b9a8",
+    "out/v32/marginal/summary.json": "fe516f58efb4518b563e48b1b401879973a424cad5b09e104f24e263510c6631",
+    "out/v32/full/summary.json": "68b9cda2f51d2a16184834b14386d6c1e28f6ab8658a0944e43972ef1f49e9d4",
+    "out/v32/legacy-hashes.json": "256d5a20f7feb9f60c2131c1e37cebcf532f296f36c4d8b1cc56847e05c734dd"
+  },
+  "verdicts": {
+    "P1": "THUA",
+    "P2": "THẮNG",
+    "P3": "THẮNG",
+    "P4": "THẮNG",
+    "P5": "THUA",
+    "P6": "THẮNG"
+  },
+  "oldData": {
+    "marginal": {
+      "seeds": 100,
+      "metrics": {
+        "profit": {
+          "count": 100,
+          "p5": 181.8081348,
+          "p50": 436.5748155,
+          "p95": 719.0428772,
+          "mean": 440.5619601200001,
+          "min": 39.419457999999985,
+          "max": 978.7234719999999
+        },
+        "flipFlops.bid": {
+          "count": 100,
+          "p5": 3.93333333333333,
+          "p50": 10,
+          "p95": 16.0666666666667,
+          "mean": 10.18,
+          "min": 2,
+          "max": 20.666666666666668
+        },
+        "flipFlops.budget": {
+          "count": 100,
+          "p5": 2,
+          "p50": 4.66666666666667,
+          "p95": 8,
+          "mean": 4.793333333333334,
+          "min": 0.6666666666666666,
+          "max": 11.333333333333334
+        }
+      },
+      "variants": [
+        {
+          "name": "P5",
+          "summary": {
+            "seeds": 100,
+            "metrics": {
+              "profit": {
+                "count": 100,
+                "p5": 129.3354144,
+                "p50": 452.4740675,
+                "p95": 730.6513609,
+                "mean": 447.1947724900003,
+                "min": 5.863228999999993,
+                "max": 996.778069
+              },
+              "flipFlops.bid": {
+                "count": 100,
+                "p5": 2.63333333333333,
+                "p50": 8.66666666666667,
+                "p95": 14.6666666666667,
+                "mean": 8.973333333333334,
+                "min": 1.3333333333333333,
+                "max": 18.666666666666668
+              },
+              "flipFlops.budget": {
+                "count": 100,
+                "p5": 2,
+                "p50": 4.66666666666667,
+                "p95": 8.66666666666667,
+                "mean": 4.826666666666666,
+                "min": 0.6666666666666666,
+                "max": 10
+              }
+            }
+          }
+        }
+      ]
+    },
+    "full": {
+      "seeds": 100,
+      "metrics": {
+        "profit": {
+          "count": 100,
+          "p5": 8391.136412,
+          "p50": 8801.912132,
+          "p95": 9142.0367554,
+          "mean": 8796.783248330003,
+          "min": 8240.288086999997,
+          "max": 9494.149653999997
+        },
+        "flipFlops.bid": {
+          "count": 100,
+          "p5": 0.5,
+          "p50": 0.5,
+          "p95": 1,
+          "mean": 0.64,
+          "min": 0.5,
+          "max": 2
+        },
+        "flipFlops.budget": {
+          "count": 100,
+          "p5": 0.5,
+          "p50": 0.5,
+          "p95": 0.5,
+          "mean": 0.5,
+          "min": 0.5,
+          "max": 0.5
+        }
+      },
+      "variants": [
+        {
+          "name": "P5",
+          "summary": {
+            "seeds": 100,
+            "metrics": {
+              "profit": {
+                "count": 100,
+                "p5": 8391.136412,
+                "p50": 8801.912132,
+                "p95": 9142.0367554,
+                "mean": 8796.783248330003,
+                "min": 8240.288086999997,
+                "max": 9494.149653999997
+              },
+              "flipFlops.bid": {
+                "count": 100,
+                "p5": 0.5,
+                "p50": 0.5,
+                "p95": 1,
+                "mean": 0.64,
+                "min": 0.5,
+                "max": 2
+              },
+              "flipFlops.budget": {
+                "count": 100,
+                "p5": 0.5,
+                "p50": 0.5,
+                "p95": 0.5,
+                "mean": 0.5,
+                "min": 0.5,
+                "max": 0.5
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

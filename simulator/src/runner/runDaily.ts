@@ -38,7 +38,7 @@ export async function runDaily(i:DailyInput){
    notifications.splice(notificationStart);notifications.push({at,campaignId:ref.campaignId??ref.id,type:'API_WRITE_FAILED',details:{ruleId:d.ruleId,failures:r.failures,waitSeconds:r.waitSeconds}});
    audit.append({runId,at,marketplaceDate:today,objectRef:ref,ruleId:d.ruleId,outcome:r.outcome==='PARTIAL_APPLY'?'PARTIAL_APPLY':'APPLY_FAILED',reasons:[...(d.ruleId==='R15'?['CREATE_FAILED']:[]),...r.failures.map(f=>`${f.entity}:${f.error}`)],inputsSnapshot:{asOf:metrics.asOf,paramsVersion:d.paramsVersion,configHash:configHash(config),now:at},...stateDiff(d.before,state),paramsVersion:d.paramsVersion});
    const index=decisions.indexOf(d);decisions.splice(index,1);
-   if(r.acked.length)decisions.push({...d,after:state,baseBidTargetIds:d.baseBidTargetIds.filter(id=>state.targets[id]?.baseBidMicros!==d.before.targets[id]?.baseBidMicros)});
+   if(r.acked.length){const applied={...d,after:state,baseBidTargetIds:d.baseBidTargetIds.filter(id=>state.targets[id]?.baseBidMicros!==d.before.targets[id]?.baseBidMicros)};if(d.zeroOrderWindows)Object.defineProperty(applied,"zeroOrderWindows",{value:d.zeroOrderWindows,enumerable:false});if(d.measurementReads)Object.defineProperty(applied,"measurementReads",{value:d.measurementReads,enumerable:false});decisions.push(applied);}
   }
  };
  const ids=Object.keys(state.campaigns).sort();

@@ -6,5 +6,5 @@ export const evaluate: RuleDefinition['evaluate'] = (ref, ctx) => {
     if (!m || m.tag !== 'NORMAL' || m.budgetTierIndex !== 0)
         return null;
     const w = window(id, ctx, 3);
-    return w.eligible && w.orders >= 1 && acosLt(w.acos, ctx.thresholdsByCampaign[id]!.T_ok) ? propose(id, ctx, { baselineAcos: w.acos }, 1) : null;
+    return w.eligible && w.orders >= 1 && acosLt(w.acos, ctx.thresholdsByCampaign[id]!.T_ok * (ctx.config.v32.hysteresis ? ctx.config.v32Hysteresis.budgetUp : 1)) ? propose(id, ctx, { baselineAcos: w.acos }, 1) : null;
 };

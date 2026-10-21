@@ -10,7 +10,7 @@ import type {
   Decision,
 } from "./types.js";
 import { isInCooldown, isGraceBlocked, applyResetOnEffectiveChange, type CooldownKind } from "./cooldown.js";
-import { marketplaceHour, toMarketplaceDate, instant } from "../time/clock.js";
+import { calendarDaysBetween, marketplaceHour, toMarketplaceDate, instant } from "../time/clock.js";
 import { clampBid, G6_RULES } from "../guards/bid.js";
 import { immutableSnapshot, stateDiff, configHash as hashConfig, type AuditOutcome } from "../audit/log.js";
 export const CAMPAIGN = [
@@ -102,12 +102,16 @@ export function firstMatchWins(
       record(rule.id, "NOT_ELIGIBLE", ["TARGET_PAUSED"]);
       continue;
     }
-    if (rule.schedule === "every3Days" && !scheduled(campaignId ?? objectRef.id, ctx)) {
+    if (rule.schedule === "every3Days" && !(rule.id === "R08" && ctx.config.v32.r08Daily) && !scheduled(campaignId ?? objectRef.id, ctx)) {
       record(rule.id, "NOT_SCHEDULED"); continue;
     }
     if (memory && rule.blockedByTag.includes(memory.tag)) {
       record(rule.id, "BLOCKED_BY_TAG");
       continue;
+    }
+    if(rule.id==='R06'&&campaignId&&ctx.config.v32.postHarvestGraceDays>0&&
+       (before.negatives?.[campaignId]??[]).some(n=>n.harvestKeywordId&&n.harvestedAt&&calendarDaysBetween(toMarketplaceDate(n.harvestedAt,ctx.config.marketplace),ctx.today,ctx.config.marketplace.zone)>=0&&calendarDaysBetween(toMarketplaceDate(n.harvestedAt,ctx.config.marketplace),ctx.today,ctx.config.marketplace.zone)<ctx.config.v32.postHarvestGraceDays)){
+      record(rule.id,'BLOCKED_BY_HARVEST_GRACE');continue;
     }
     if (memory && isGraceBlocked(rule.id, memory, at)) {
       record(rule.id, "BLOCKED_BY_GRACE");
@@ -268,7 +272,7 @@ export function firstMatchWins(
     }
     if (rule.id === "R01" && campaignId && campaignMemory[campaignId]) campaignMemory[campaignId] = startGrace(campaignMemory[campaignId]!, at, ctx.config);
     after = { ...after, targets: stampedTargets, campaignMemory };
-    const decision: Decision = immutableSnapshot({
+    const decision: Decision = { ...immutableSnapshot({
       asOf:ctx.metrics.asOf,
       runId: ctx.runId,
       objectRef,
@@ -279,7 +283,14 @@ export function firstMatchWins(
       ...(reasons.length ? { reasons } : {}),
       paramsVersion: ctx.paramsVersion,
       ...(proposal.outboundTargets ? { outboundTargets: proposal.outboundTargets } : {}),
-    });
+    }) };
+    if (["R06","R12","R13","R16","R17","R05","R08"].includes(rule.id)) {
+      const evidence = ctx.metrics.zeroOrderEvidence;
+      const windows = evidence.filter(r => r.query.kind === "campaignWindow" && (r.totals as {orders:number}).orders === 0).map(r => ({entity:r.query.id,from:r.from,to:r.to}));
+      if (windows.length) Object.defineProperty(decision,"zeroOrderWindows",{value:immutableSnapshot(windows),enumerable:false});
+    }
+    if(decision.zeroOrderWindows?.length)Object.defineProperty(decision,"measurementReads",{value:immutableSnapshot(ctx.metrics.recordedReads),enumerable:false});
+    Object.freeze(decision);
     ctx.decisions.push(decision);
     for (const event of proposal.notifications ?? []) ctx.notify(event);
     record(rule.id, "MATCHED", reasons, after);

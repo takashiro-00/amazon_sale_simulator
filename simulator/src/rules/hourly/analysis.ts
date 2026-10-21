@@ -15,7 +15,7 @@ export function outboundBid(m:TargetMemory,h:Hour,t:DerivedThresholds,tos:number
  if(cap<t.Bid_min)throw new Error('EMPTY_BID_RANGE');
  return micros(Math.max(t.Bid_min,Math.min(cap,roundBidToCent(micros(Math.round(m.baseBidMicros*f))))));
 }
-export interface HourlyAnalysisRecord {at:string;targetId:string;hour:Hour;before:number;after:number;clicks:number;impressions:number;orders:number;budgetCapped:boolean;}
+export interface HourlyAnalysisRecord {at:string;targetId:string;hour:Hour;before:number;after:number;clicks:number;impressions:number;orders:number;budgetCapped:boolean;cleanDays?:number;}
 export function analyzeHours(c:RuleContext,only?:"R20"|"R21",onAnalysis?:(record:HourlyAnalysisRecord)=>void):EngineState{
  if(instant(c.clock.now()).setZone(c.config.marketplace.zone).weekday!==c.config.hourlyAnalysisWeekday)return c.state;
  const targets={...c.state.targets};
@@ -25,15 +25,17 @@ export function analyzeHours(c:RuleContext,only?:"R20"|"R21",onAnalysis?:(record
   const scope=c.config.ambiguity.hourlyScope==='campaign'?e.campaignId:id;
   const w=resolveWindow({kind:'rolling',days:28,minRipeDays:1},c.today,{windowStartAt:'1900-01-01T00:00Z'},c.config);
   const fs=c.metrics.granular(scope,w.from,w.to).filter(f=>f.hour!==undefined&&f.placement===undefined);
-  const all=c.metrics.aggregate(fs),cv=all.clicks?all.orders/all.clicks:0,m=targets[id]!,t=c.thresholds[id]!,tos=c.state.campaigns[e.campaignId]!.topOfSearchPct;
+  const capped=new Set(fs.filter(f=>f.budgetCapped).map(f=>`${f.marketplaceDate}:${f.hour}`));
+  const clean=c.config.v32.hourlyExcludeCapped?fs.filter(f=>!capped.has(`${f.marketplaceDate}:${f.hour}`)):fs;
+  const all=c.metrics.aggregate(clean),cv=all.clicks?all.orders/all.clicks:0,m=targets[id]!,t=c.thresholds[id]!,tos=c.state.campaigns[e.campaignId]!.topOfSearchPct;
   const factors={} as Record<Hour,number>;
   for(let i=0;i<24;i++){
-   const h=i as Hour,a=c.metrics.aggregate(fs.filter(f=>f.hour===h));let factor=1;
-   if(a.clicks>=c.config.thresholds.hourlyClicks){
+   const h=i as Hour,evidence=clean.filter(f=>f.hour===h),a=c.metrics.aggregate(evidence),cleanDays=new Set(evidence.map(f=>f.marketplaceDate)).size;let factor=1;
+   if((!c.config.v32.hourlyExcludeCapped||cleanDays>=20)&&a.clicks>=c.config.thresholds.hourlyClicks){
     if(only!=='R21'&&a.orders/a.clicks<.5*cv)factor=Math.max(.70,t.Bid_min/m.baseBidMicros);
     else if(only!=='R20'&&c.state.campaignMemory[e.campaignId]?.tag==='NORMAL'&&a.orders>=2&&cv>0&&a.orders/a.clicks>=1.3*cv)factor=Math.min(1.15,t.Bid_max/m.baseBidMicros,1.5*t.Bid_max/(1+tos/100)/m.baseBidMicros);
    }
-   factors[h]=factor;onAnalysis?.({at:c.clock.now(),targetId:id,hour:h,before:m.hourlyFactor[h],after:factor,clicks:a.clicks,impressions:a.impressions,orders:a.orders,budgetCapped:fs.some(f=>f.hour===h&&f.budgetCapped===true)});
+   factors[h]=factor;onAnalysis?.({at:c.clock.now(),targetId:id,hour:h,before:m.hourlyFactor[h],after:factor,clicks:a.clicks,impressions:a.impressions,orders:a.orders,budgetCapped:evidence.some(f=>f.budgetCapped===true),...(c.config.v32.hourlyExcludeCapped?{cleanDays}:{})});
   }
   targets[id]={...m,hourlyFactor:factors};
  }

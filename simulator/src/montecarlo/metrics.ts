@@ -7,12 +7,12 @@ import { window as campaignWindow } from '../rules/campaign/shared.js';
 import { registry } from '../rules/registry.js';
 import { deriveThresholds } from '../domain/params.js';
 import { micros } from '../domain/money.js';
-import { date,SimClock,toMarketplaceDate } from '../time/clock.js';
+import { date,SimClock,toMarketplaceDate,calendarDaysBetween } from '../time/clock.js';
 import { productAt } from '../market/events.js';
 import { AuditLog } from '../audit/log.js';
 import type { RuleContext,Decision } from '../engine/types.js';
 export type MetricValue=number|null|{[key:string]:MetricValue};
-export interface MonteCarloRun {seed:string|number;metrics:Record<string,MetricValue>}
+export interface MonteCarloRun {seed:string|number;metrics:Record<string,MetricValue>;zeroOrderEvidence?: readonly {ruleId:string;runId:string;entity:string;windows:readonly {entity:string;from:string;to:string;trueOrders:number}[]}[]}
 const measured=['R06','R13','R12','R16','R17','R05B','R08'] as const;
 export function maturePremature(s:Scenario,config:SimConfig,decisions:readonly Decision[],facts:readonly MetricFact[]){
  const premature:Record<string,number>=Object.fromEntries(measured.map(id=>[id,0]));let prematurePause=0;
@@ -27,6 +27,32 @@ export function maturePremature(s:Scenario,config:SimConfig,decisions:readonly D
   if(!stillMatches){premature[label]=(premature[label]??0)+1;if(d.ruleId==='R06'||d.ruleId==='R13')prematurePause++;}
  }
  return {premature,prematureTotal:Object.values(premature).reduce((a,b)=>a+b,0),prematurePause};
+}
+/** Truth over the actual recorded evidence; never re-evaluates a rule or uses variant config. */
+export function wrongZeroOrders(s:Scenario,decisions:readonly Decision[],facts:readonly MetricFact[]){
+ const wrongZeroOrder:Record<string,number>=Object.fromEntries(measured.map(id=>[id,0]));let wrongZeroOrderPause=0;
+ const asOf=date(s.startDate,s.marketplace.zone).plus({days:s.days+15}).toUTC().toISO()!,index=new FactIndex(facts);
+ for(const d of decisions){if(!d.zeroOrderWindows?.length||(!(measured as readonly string[]).includes(d.ruleId)&&d.ruleId!=='R05'))continue;
+  const wrong=d.zeroOrderWindows.some(w=>queryFacts(index,{entityRef:w.entity,from:w.from,to:w.to,asOf,dailyOnly:true}).some(f=>f.orders>0));
+  if(wrong){const id=d.ruleId==='R05'?'R05B':d.ruleId;wrongZeroOrder[id]=(wrongZeroOrder[id]??0)+1;if((d.ruleId==='R06'&&d.before.campaigns[d.objectRef.id]?.status==='ENABLED'&&d.after.campaigns[d.objectRef.id]?.status==='PAUSED')||(d.ruleId==='R13'&&d.before.targetEntities[d.objectRef.id]?.status==='ENABLED'&&d.after.targetEntities[d.objectRef.id]?.status==='PAUSED'))wrongZeroOrderPause++;}
+ }
+ return {wrongZeroOrder,wrongZeroOrderTotal:Object.values(wrongZeroOrder).reduce((a,b)=>a+b,0),wrongZeroOrderPause};
+}
+/** Delay within the decision's spend/click window; one observation per executed zero-order action. */
+export function actionDelays(s:Scenario,config:SimConfig,decisions:readonly Decision[],facts:readonly MetricFact[]){
+ const values:number[]=[],index=new FactIndex(facts),asOf=date(s.startDate,s.marketplace.zone).plus({days:s.days+15}).toUTC().toISO()!;
+ for(const d of decisions){if(!d.zeroOrderWindows?.length)continue;
+  const w=d.measurementReads?.find(r=>r.query.kind==='campaignWindow');if(!w)continue;
+  const cid=d.objectRef.campaignId??(d.objectRef.group==='CAMPAIGN'?d.objectRef.id:d.before.targetEntities[d.objectRef.id]?.campaignId),c=cid?d.before.campaigns[cid]:undefined;if(!c)continue;
+  const at=d.runId.split('|')[0]!,p=productAt(s,c.asin,at),t=deriveThresholds({asin:c.asin,priceMicros:micros(Math.round(p.priceUsd*1e6)),breakEvenAcos:p.breakEvenAcos,expCvr:p.expectedCvr},config).thresholds;
+  let spend=0,clicks=0;
+  for(const f of [...queryFacts(index,{entityRef:w.query.id,from:w.from,to:w.to,asOf,dailyOnly:true})].sort((a,b)=>a.marketplaceDate.localeCompare(b.marketplaceDate))){
+   spend+=f.spendMicros;clicks+=f.clicks;
+   const met=d.ruleId==='R06'?((spend>=t.Spend_zero&&clicks>=t.N2)||spend>=Math.min(2.5*t.Spend_zero,63000000)):d.ruleId==='R12'?clicks>=t.N2:d.ruleId==='R13'?clicks>=t.N3&&spend>=2*t.CPA_target:d.ruleId==='R16'?clicks>=t.N3:d.ruleId==='R17'?clicks>=t.N17&&spend>=2.5*t.CPA_target:d.ruleId==='R05'?spend>=Math.min(t.CPA_target,.6*t.Spend_zero):spend>=.6*t.Spend_zero;
+   if(met){values.push(calendarDaysBetween(f.marketplaceDate,toMarketplaceDate(at,s.marketplace),s.marketplace.zone));break;}
+  }
+ }
+ return {actionDelayDays:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,actionDelayCount:values.length};
 }
 /** Count a union of physical target/query spend; campaign pauses expand to targets. */
 export function measureWastedSpend(s:Scenario,config:SimConfig,decisions:readonly Decision[],daily:readonly MetricFact[]):number{
@@ -59,6 +85,7 @@ export function measureRun(s:Scenario,config:SimConfig,r:Awaited<ReturnType<type
  // SPEC-AMBIGUITY: mcTierScope=first-campaign reports the first campaign to reach a tier.
  const tier=(amount:number)=>{if(s.campaigns.some(c=>c.budget>=amount))return 0;const matches=r.timeline.filter(t=>t.budget>=amount);return matches.length?Math.min(...matches.map(t=>t.day)):null;};
  const notifications:Record<string,number>={};for(const n of r.notifications)notifications[n.type]=(notifications[n.type]??0)+1;
- return {seed:s.seed,metrics:{...maturePremature(s,config,r.decisions,mature),flipFlops:{budget:budget*30/s.days,bid:bid*30/s.days},wastedSpend,timeToTier:{to12:tier(12),to25:tier(25)},spend,sales,acos:sales?spend/sales:null,profit,invariantViolations:0,apiFailures:r.portCalls.filter(c=>c.outcome!=='ok').length,driftEvents:notifications.DRIFT_DETECTED??0,notifications}};
+ return {seed:s.seed,metrics:{...maturePremature(s,config,r.decisions,mature),...wrongZeroOrders(s,r.decisions,mature),...actionDelays(s,config,r.decisions,mature),flipFlops:{budget:budget*30/s.days,bid:bid*30/s.days},wastedSpend,timeToTier:{to12:tier(12),to25:tier(25)},spend,sales,acos:sales?spend/sales:null,profit,invariantViolations:0,apiFailures:r.portCalls.filter(c=>c.outcome!=='ok').length,driftEvents:notifications.DRIFT_DETECTED??0,notifications}};
 }
-export async function runSeed(scenario:Scenario,config:SimConfig,seed:string|number):Promise<MonteCarloRun>{const s={...scenario,seed},cfg={...config,audit:{level:'matched' as const}},r=await runAccountLoop({scenario:s,config:cfg});return measureRun(s,cfg,r);}
+export async function runSeed(scenario:Scenario,config:SimConfig,seed:string|number):Promise<MonteCarloRun>{const s={...scenario,seed},cfg={...config,audit:{level:'matched' as const}},r=await runAccountLoop({scenario:s,config:cfg});const asOf=date(s.startDate,s.marketplace.zone).plus({days:s.days+15}).toUTC().toISO()!,index=new FactIndex(r.matureFacts);
+ return {...measureRun(s,cfg,r),zeroOrderEvidence:r.decisions.filter(d=>d.zeroOrderWindows?.length).map(d=>({ruleId:d.ruleId,runId:d.runId,entity:d.objectRef.id,windows:d.zeroOrderWindows!.map(w=>({...w,trueOrders:queryFacts(index,{entityRef:w.entity,from:w.from,to:w.to,asOf,dailyOnly:true}).reduce((n,f)=>n+f.orders,0)}))}))};}
