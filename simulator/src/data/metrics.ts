@@ -7,7 +7,8 @@ import type { SimConfig } from '../../config/defaults.js';
 export interface MetricRead { query: { kind: string; id: string }; from: string; to: string; totals: unknown }
 export class MetricsReader {
     private reads: MetricRead[] = [];
-    resetReads() { this.reads = []; }
+    zeroOrderEvidence: MetricRead[] = [];
+    resetReads() { this.reads = []; this.zeroOrderEvidence = []; }
     get recordedReads(): readonly MetricRead[] { return this.reads; }
     private record(kind: string, id: string, from: string, to: string, facts: readonly import('./facts.js').MetricFact[]) {
         this.reads.push({query:{kind,id},from,to,totals:this.aggregate(facts)});

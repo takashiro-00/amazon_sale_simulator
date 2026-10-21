@@ -10,9 +10,10 @@ import { measureRun } from '../dist/src/montecarlo/metrics.js';
 import { queryFacts } from '../dist/src/data/facts.js';
 import { date, calendarDaysBetween, toMarketplaceDate } from '../dist/src/time/clock.js';
 const load = async (name) => JSON.parse(await readFile(`scenarios/${name}.json`, 'utf8'));
-await mkdir('out/v32/edge', { recursive: true });
+const root=process.env.V32_OUT??'out/v32';
+await mkdir(`${root}/edge`, { recursive: true });
 const started = performance.now();
-const write = async (name, value) => writeFile(`out/v32/edge/${name}.json`, JSON.stringify(value, null, 2) + '\n');
+const write = async (name, value) => writeFile(`${root}/edge/${name}.json`, JSON.stringify(value, null, 2) + '\n');
 for (const [proposal, overrides] of [['P2', ['v32.r06CalendarGuard=true']], ['P3', ['v32.r08Daily=true']]]) {
     const phases = [];
     for (let phase = 0; phase < 3; phase++) {
@@ -42,7 +43,7 @@ for (const [name, proposal, overrides] of [['full-account', 'P4', ['v32.postHarv
     }
     await write(name.includes('hourly-signal') ? 'hourly-signal' : proposal === 'P4' ? 'E6' : 'A5', { proposal, variants });
 }
-for (const [name, proposal, variantsToRun] of [['edge/premature-positive', 'P1', [[2, []], [3, ['v32.zeroOrderLagDays=3']], [4, ['v32.zeroOrderLagDays=4']]]], ['marginal-account', 'P5', [[false, []], [true, ['v32.hysteresis=true']]]]]) {
+for (const [name, proposal, variantsToRun] of [['edge/premature-positive', 'P1', [[2, []], [3, ['v32.zeroOrderLagDays=3']], [5, ['v32.zeroOrderLagDays=5']], [8, ['v32.zeroOrderLagDays=8']]]], ['marginal-account', 'P5', [[false, []], [true, ['v32.hysteresis=true']]]]]) {
     const variants = [];
     for (const [value, overrides] of variantsToRun) {
         const scenario = await load(name), config = applyOverrides(DEFAULT_CONFIG, overrides), r = await runAccountLoop({ scenario, config });
@@ -50,5 +51,5 @@ for (const [name, proposal, variantsToRun] of [['edge/premature-positive', 'P1',
     }
     await write(proposal === 'P1' ? 'P1-positive' : 'P5-marginal', { proposal, variants });
 }
-await write('duration', { durationMs: performance.now() - started, runs: 23 });
+await write('duration', { durationMs: performance.now() - started, runs: 24 });
 console.log('v3.2 edges complete');

@@ -628,6 +628,10 @@ Xác minh: `npm run typecheck` pass; `npm test`: **298/298 test, 37 file, 27.12 
 
 ## Bước 6 — thử nghiệm v3.2 (mặc định giữ v3.1)
 
+**Lịch sử:** các lệnh K3/K4 và nhận xét premature dưới đây là bản Bước 6 cũ.
+Phương pháp và kết luận hiện hành được thay bằng [Bước 6b](#bước-6b--sửa-phép-đo-v32)
+và báo cáo `docs/simulator/v3.2-results.md`; dùng lệnh Bước 6b để tái lập.
+
 Chỉ sửa trong `simulator/`. Báo cáo chi tiết được đặt tại
 [docs/simulator/v3.2-results.md](docs/simulator/v3.2-results.md) để tuân thủ phạm vi này;
 không sửa spec hoặc proposals bên ngoài simulator.
@@ -721,3 +725,32 @@ edge bật/tắt và kết luận từ báo cáo Markdown.
 Tổng thời gian lệnh Monte Carlo đã lưu và bộ edge cuối: **4936.594 giây (82.28 phút)**. Đây là tổng durationMs từng lệnh, gồm cả lượt kiểm tra lại/exploratory và lệnh dang dở được chạy lại, có ghi trong out/v32; không phải wall time vì có lệnh chạy song song. Chi tiết từng lệnh, số lượt và định nghĩa tại [out/v32/timing.json](out/v32/timing.json). Không tính build, Vitest hoặc đối chiếu hash vào tổng durationMs.
 
 Khoảng thời gian lịch từ lệnh MC đầu tiên đến output MC cuối: **54.90 phút**, gồm cả khoảng chờ/triển khai giữa các lệnh; không phải thời gian CPU. Mốc đầu ước lượng từ birthtime summary đầu tiên trừ durationMs của lệnh đó.
+
+## Bước 6b — sửa phép đo v3.2
+
+Báo cáo hiện hành: [`docs/simulator/v3.2-results.md`](docs/simulator/v3.2-results.md)
+(giữ trong `simulator/` theo phạm vi được phép). Kết luận P1 cũ dựa trên
+premature bị bỏ. `premature (rule-relative)` chỉ tham khảo; quyết định v3.2 dùng
+`wrongZeroOrder` và rate seed có `wrongZeroOrderPause`.
+
+```sh
+npm test
+npm run typecheck
+npm run build
+node scripts/v32-truth-mc.mjs
+V32_OUT=out/v32-truth node scripts/v32-edge.mjs
+node scripts/v32-truth-hashes.mjs
+node scripts/v32-truth-validate.mjs
+node scripts/v32-results.mjs
+npm run report -- --edge out/edge --mc out/v32-truth/full --v32 out/v32-truth --out out/report
+```
+
+Ma trận mới: 100 seed/cấu hình, `--workers auto`, K3/K5/K8 trên
+premature-population, attribution-storm-account, marginal-account, full-account;
+đồng thời chạy lại P2/P3/P4 và tổ hợp P2+P3+P4+P6. Output tại `out/v32-truth/`,
+JSONL lưu riêng `zeroOrderEvidence` (from/to/entity và trueOrders từng cửa sổ).
+Thuộc tính đo trên decision là non-enumerable để giữ hash JSON v3.1; khi cần
+lưu decision bằng JSON bên ngoài Monte Carlo, xuất `zeroOrderWindows` tường minh.
+Độ trễ hành động đo từ ngày đầu đủ spend/click trong cửa sổ gốc đến ngày chạy,
+chỉ trên decision đã thực thi; null là không có quan sát. Số đếm quan sát lưu ở
+`actionDelayCount`. Mặc định mọi flag v32 giữ nguyên.

@@ -73,6 +73,8 @@ export interface Proposal {
   readonly reasons?: readonly string[];
 }
 export interface Decision {
+ readonly measurementReads?: readonly import("../data/metrics.js").MetricRead[];
+ readonly zeroOrderWindows?: readonly {entity: string; from: string; to: string}[];
  readonly asOf?: string;
  readonly reasons?: readonly string[];
  readonly outboundTargets?: readonly import("../api/port.js").TargetUpdate[];

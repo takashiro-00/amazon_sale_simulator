@@ -43,3 +43,7 @@ it('reads all result files and preserves measured evidence in both outputs', () 
     expect(extractFindings('## Phát hiện Bước 4\nevidence two')).toContain('evidence two');
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+it('labels premature as rule-relative and displays truth and delay metrics',()=>{
+ const result=renderReport({edges:[],monteCarlo:[],v32:{edges:[],experiments:[{name:'truth',summary:{metrics:{wrongZeroOrderPause:{p50:1,mean:1},actionDelayDays:{p50:8,mean:8},prematureTotal:{p50:2,mean:2}},variants:[{name:'K8',summary:{metrics:{wrongZeroOrderPause:{p50:0,mean:0},actionDelayDays:{p50:9,mean:9},prematureTotal:{p50:3,mean:3}}},diff:{},paired:{}}]}}]}});
+ expect(result.html).toContain('premature (rule-relative)');expect(result.html).toContain('wrongZeroOrderPause');expect(result.html).toContain('actionDelayDays');
+});

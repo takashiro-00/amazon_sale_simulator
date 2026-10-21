@@ -10,7 +10,7 @@ export function flatten(value:Record<string,MetricValue>,prefix=''):Record<strin
 export function summarizeRuns(runs:readonly MonteCarloRun[]){
  const flattened=runs.map(r=>flatten(r.metrics)),keys=new Set(flattened.flatMap(r=>Object.keys(r))),columns=new Map<string,number[]>();for(const key of keys){const col:number[]=[];for(const row of flattened){const value=Object.hasOwn(row,key)?row[key]:0;if(value!==null&&value!==undefined)col.push(value);}columns.set(key,col);}
  const metrics:Record<string,Distribution>={};for(const [key,col] of columns){col.sort((a,b)=>a-b);if(!col.length)continue;const percentile=(p:number)=>{const i=(col.length-1)*p,lo=Math.floor(i),f=i-lo;return Number((col[lo]!*(1-f)+col[Math.ceil(i)]!*f).toPrecision(15));};metrics[key]={count:col.length,p5:percentile(.05),p50:percentile(.5),p95:percentile(.95),mean:col.reduce((a,b)=>a+b,0)/col.length,min:col[0]!,max:col.at(-1)!};}
- return {seeds:runs.length,metrics,prematurePauseRunRate:runs.filter(r=>(r.metrics.prematurePause as number)>0).length/Math.max(1,runs.length)};
+ return {seeds:runs.length,metrics,wrongZeroOrderPauseRunRate:runs.filter(r=>(r.metrics.wrongZeroOrderPause as number)>0).length/Math.max(1,runs.length),prematurePauseRunRate:runs.filter(r=>(r.metrics.prematurePause as number)>0).length/Math.max(1,runs.length)};
 }
 export function compareSummaries(baseline:ReturnType<typeof summarizeRuns>,comparison:ReturnType<typeof summarizeRuns>):Record<string,Record<string,number>>{
  const diff:Record<string,Record<string,number>>={};for(const key of new Set([...Object.keys(baseline.metrics),...Object.keys(comparison.metrics)])){

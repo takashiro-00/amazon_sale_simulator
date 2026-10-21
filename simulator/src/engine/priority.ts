@@ -272,7 +272,7 @@ export function firstMatchWins(
     }
     if (rule.id === "R01" && campaignId && campaignMemory[campaignId]) campaignMemory[campaignId] = startGrace(campaignMemory[campaignId]!, at, ctx.config);
     after = { ...after, targets: stampedTargets, campaignMemory };
-    const decision: Decision = immutableSnapshot({
+    const decision: Decision = { ...immutableSnapshot({
       asOf:ctx.metrics.asOf,
       runId: ctx.runId,
       objectRef,
@@ -283,7 +283,14 @@ export function firstMatchWins(
       ...(reasons.length ? { reasons } : {}),
       paramsVersion: ctx.paramsVersion,
       ...(proposal.outboundTargets ? { outboundTargets: proposal.outboundTargets } : {}),
-    });
+    }) };
+    if (["R06","R12","R13","R16","R17","R05","R08"].includes(rule.id)) {
+      const evidence = ctx.metrics.zeroOrderEvidence;
+      const windows = evidence.filter(r => r.query.kind === "campaignWindow" && (r.totals as {orders:number}).orders === 0).map(r => ({entity:r.query.id,from:r.from,to:r.to}));
+      if (windows.length) Object.defineProperty(decision,"zeroOrderWindows",{value:immutableSnapshot(windows),enumerable:false});
+    }
+    if(decision.zeroOrderWindows?.length)Object.defineProperty(decision,"measurementReads",{value:immutableSnapshot(ctx.metrics.recordedReads),enumerable:false});
+    Object.freeze(decision);
     ctx.decisions.push(decision);
     for (const event of proposal.notifications ?? []) ctx.notify(event);
     record(rule.id, "MATCHED", reasons, after);
