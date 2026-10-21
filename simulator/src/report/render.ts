@@ -1,7 +1,7 @@
 import { DEFAULT_CONFIG } from '../../config/defaults.js';
 export interface EdgeResult { id: string; type: string; status?: string; pass?: boolean | null; metrics?: Record<string, unknown>; explanation: string; evidence?: string[] }
 export interface MonteCarloInput { name: string; summary: Record<string, unknown>; runs: Record<string, unknown>[] }
-export interface ReportInput { edges: EdgeResult[]; monteCarlo: MonteCarloInput[]; findings?: string }
+export interface ReportInput { edges: EdgeResult[]; monteCarlo: MonteCarloInput[]; findings?: string; v32?: {experiments:{name:string;summary:Record<string,unknown>}[];edges:unknown[];results?:string} }
 const escape = (x: unknown) => String(x ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const display = (x: unknown): string => typeof x === 'number' ? (Number.isFinite(x) ? String(Math.round(x * 10000) / 10000) : String(x)) : typeof x === 'object' && x !== null ? JSON.stringify(x) : String(x ?? 'null');
 function flatten(value: unknown, prefix = ''): Record<string, number> {
@@ -41,6 +41,23 @@ export function renderReport(input: ReportInput): { html: string; markdown: stri
       md.push(`Histogram ${key}: ${values.length} quan sát; min=${display(values.length ? Math.min(...values) : null)}, max=${display(values.length ? Math.max(...values) : null)}.`, '');
     }
     if (mc.summary.compare) { paragraph('So sánh cùng seed'); const comparison = mc.summary.compare as Record<string, unknown>; paragraph(`Override: ${display(comparison.override)}`); table(['Chỉ số', 'Chênh lệch'], Object.entries(flatten(comparison.diff)).sort(([a], [b]) => a.localeCompare(b, 'en'))); }
+  }
+  if(input.v32){
+    heading('Thử nghiệm v3.2');
+    paragraph('Baseline v3.1 mặc định; mỗi biến thể dùng cùng tập seed. Delta = biến thể − baseline; tỷ lệ tốt hơn là kiểm định cặp mô tả, không phải p-value.');
+    for(const experiment of input.v32.experiments){
+      heading(experiment.name);
+      const summary=experiment.summary as {metrics:Record<string,{p50:number;mean:number}>;variants?:{name:string;summary:{metrics:Record<string,{p50:number;mean:number}>};diff:Record<string,{p50:number;mean:number}>;paired:Record<string,{betterRate:number}>}[]};
+      for(const variant of summary.variants??[]){
+        paragraph(variant.name);
+        const keys=Object.keys(summary.metrics).filter(k=>/^(premature|profit|wastedSpend|flipFlops|timeToTier)/.test(k));
+        table(['Metric','Baseline p50','Baseline mean','Biến thể p50','Biến thể mean','Delta p50','Delta mean'],keys.map(key=>[key,summary.metrics[key]?.p50,summary.metrics[key]?.mean,variant.summary.metrics[key]?.p50,variant.summary.metrics[key]?.mean,variant.diff[key]?.p50,variant.diff[key]?.mean]));
+        table(['Metric','Tỷ lệ seed tốt hơn'],Object.entries(variant.paired??{}).map(([k,v])=>[k,v.betterRate]));
+      }
+    }
+    heading('Edge bật/tắt v3.2');
+    for(const edge of input.v32.edges){html.push(`<pre>${escape(JSON.stringify(edge,null,2))}</pre>`);md.push('```json',JSON.stringify(edge,null,2),'```');}
+    if(input.v32.results){heading('Kết luận v3.2');html.push(`<pre>${escape(input.v32.results)}</pre>`);md.push(input.v32.results);}
   }
   heading('Phát hiện về spec v3.1');
   paragraph('Bằng chứng Bước 3–4 được giữ nguyên từ README; số đo Bước 5 nằm trong bảng edge và Monte Carlo ở trên. Các đề xuất sau không thay đổi rule.');

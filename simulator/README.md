@@ -625,3 +625,99 @@ Qua `runAccountLoop`: **R20 giảm factor 34 lần, R21 tăng factor 33 lần, R
 Không phát hiện bug thật trong `maturePremature`, R20/R21 hay submitBoundary; **không sửa rule/metric để đạt đối chứng**. Premature cũ toàn 0 và hourly cũ 0/0 phản ánh fixture chưa có bằng chứng dương. Test mới trong `test/measurement-controls.test.ts` chạy market và account loop thật, không gọi evaluator trực tiếp. Thêm helper đo cửa sổ trong `src/edge/controls.ts`, telemetry boundary trong runner, và nối hai đối chứng vào edge suite. Dùng policy ambiguity hiện có (D-2, campaign hourly scope, first-campaign tier, excludes unreached tiers); không đưa vào lựa chọn semantics mới.
 
 Xác minh: `npm run typecheck` pass; `npm test`: **298/298 test, 37 file, 27.12 giây wall time** (test time cộng các worker 67.58 giây). 295 test cũ giữ nguyên kỳ vọng, thêm 3 test. Không commit/push.
+
+## Bước 6 — thử nghiệm v3.2 (mặc định giữ v3.1)
+
+Chỉ sửa trong `simulator/`. Báo cáo chi tiết được đặt tại
+[docs/simulator/v3.2-results.md](docs/simulator/v3.2-results.md) để tuân thủ phạm vi này;
+không sửa spec hoặc proposals bên ngoài simulator.
+
+| Flag | Mặc định v3.1 | Biến thể thử |
+| --- | --- | --- |
+| `v32.zeroOrderLagDays` | 2 | 3, 4 |
+| `v32.r06CalendarGuard` | false | true |
+| `v32.r08Daily` | false | true |
+| `v32.postHarvestGraceDays` | 0 | 7 |
+| `v32.hysteresis` | false | true |
+| `v32.hourlyExcludeCapped` | false | true |
+
+**P1 — định nghĩa cửa sổ zero-order.** Chỉ bằng chứng “0 đơn” của R06/R12/R13/R16/R17,
+R05 nhánh B và R08 dịch điểm kết thúc từ D-2 sang D-K. Cửa sổ rolling giữ số ngày,
+W_post vẫn cắt theo mốc reset; khoảng “từ lần R12 gần nhất” của R13 giữ toàn bộ mốc bắt đầu,
+không cắt còn 30 ngày. Hai ngày của zeroOrdersRobust là D-K-1 và D-K. Ngoài ra, có đơn
+ở **bất kỳ ngày nào từ D-K+1 đến D-2** thì không thỏa zero-order. Cần đủ coverage để
+chứng minh zero-order; thiếu ngày không được coi như 0 đơn. Spend, click và các ngưỡng
+khác của rule vẫn lấy cửa sổ gốc kết thúc D-2. P1 không làm tất cả dữ liệu của rule chậm K ngày.
+
+P2 thêm nhánh HOẶC của R06: 14 ngày lịch kết thúc D-2, không cắt theo reset,
+spend ≥ 2×Spend_zero và zero-order theo P1 nếu bật. Nhánh cũ giữ nguyên.
+P3 chỉ cho R08 bỏ gate every3Days; R07/R09 giữ lịch cũ.
+P4 bắt đầu từ lần ghi Negative Exact của harvest thành công, không phải lúc đề nghị tạo Exact.
+Ngày ghi là ngày 0; chặn R06 khi số ngày lịch marketplace nằm trong [0,N), ghi audit
+`BLOCKED_BY_HARVEST_GRACE`. Các rule khác không bị gate này. Ghi thất bại không tạo ân hạn.
+
+Hệ số P5 có thể chỉnh tại `config.v32Hysteresis`: `bidUp=.9`, `bidDown=1.1`,
+`budgetUp=.95`, `budgetWinUp=.95`, `budgetDown=1.05`. Chỉ ngưỡng kích hoạt đổi;
+không đổi công thức lượng tăng/giảm. R10 áp dụng ngưỡng mới ở cả W14 và W_post.
+P6 loại toàn bộ bucket của ngày/giờ có cap trước khi tính CVR giờ và CVR đối chiếu.
+Mỗi giờ cần ≥20 **ngày lịch phân biệt** không cap trong 28 ngày; không đủ thì factor =1,
+kể cả trước đó đã có factor khác 1. `hourlyAnalyses.cleanDays` ghi số ngày sạch khi bật P6.
+
+Khi mọi flag tắt, không thêm field memory/negative/telemetry; config hash audit được tính
+trên hình dạng config v3.1 để giữ hash cũ. Regression hash kiểm cả state, quyết định,
+audit, timeline và API calls. Các hệ số hysteresis không có hiệu lực khi P5 tắt.
+
+### So sánh cấu hình
+
+```sh
+npm run mc -- scenarios/marginal-account.json --seeds 100 --workers auto \
+  --variant P1-K3 'v32.zeroOrderLagDays=3' \
+  --variant P5 'v32.hysteresis=true' \
+  --variant custom 'v32.hysteresis=true v32.r08Daily=true' \
+  --out out/v32/example
+```
+
+Mỗi `--variant NAME` nhận một hoặc nhiều `key=value`, có thể gộp trong dấu nháy.
+Baseline luôn v3.1 mặc định ở CLI; mỗi biến thể chạy đúng seed 0…99 của baseline.
+`summary.json.variants` chứa summary, diff (gồm p50/mean), paired better/tied/worse và
+betterRate cho profit, wastedSpend, prematureTotal, tổng flipFlops bid+budget.
+`NAME-runs.jsonl` giữ từng seed. BetterRate loại tie khỏi tử số, vẫn giữ tie trong mẫu số;
+đây là kiểm định cặp mô tả, không phải p-value. Cú pháp `--compare key=value` cũ vẫn chạy;
+nhiều `--compare` cũ vẫn gộp thành một cấu hình so sánh như trước. `summary.compare.paired` cũng có thống kê cặp cùng định nghĩa như biến thể có tên.
+
+### Tái lập thử nghiệm
+
+Quần thể premature có năm campaign độc lập, mỗi campaign một target CVR thật 2%–6%,
+giữ lag 3/5/7 ngày của đối chứng. Không thay rule để tạo tín hiệu và không chỉnh scenario
+sau khi xem kết quả. Cổng sau chạy baseline trước, yêu cầu ≥10% seed có premature,
+rồi mới chạy các biến thể; không đạt thì dừng để xem lại scenario:
+
+```sh
+npm run typecheck
+npm test
+npm run build
+node dist/src/cli/mc.js scenarios/edge/premature-population.json \
+  --seeds 100 --workers auto --min-premature-seed-rate 0.1 \
+  --variant P1-K3 v32.zeroOrderLagDays=3 --variant P1-K4 v32.zeroOrderLagDays=4 \
+  --out out/v32/P1-premature-population
+sh scripts/v32-mc.sh
+node scripts/v32-edge.mjs
+node scripts/v32-results.mjs
+node scripts/v32-combined.mjs
+node scripts/v32-results.mjs
+npm run report -- --edge out/edge --mc out/mc/full-account \
+  --v32 out/v32 --out out/report
+```
+
+B1/B2 là descriptor, script dùng đúng ScriptedMarket/ba pha của edge suite hiện có;
+E6/A5 dùng full-account thật, hourly-signal dùng đối chứng thật. Không thay script/rule
+để một đề xuất thắng. Các biến thể chung scenario chia sẻ baseline để tránh chạy lại
+100 seed baseline cho từng đề xuất. Report mặc định đọc `out/v32` nếu có; có thể đổi
+bằng `--v32 DIR`. Mục **Thử nghiệm v3.2** gồm bảng metric/delta, tỷ lệ seed tốt hơn,
+edge bật/tắt và kết luận từ báo cáo Markdown.
+
+### Thời gian chạy thử nghiệm v3.2
+
+Tổng thời gian lệnh Monte Carlo đã lưu và bộ edge cuối: **4936.594 giây (82.28 phút)**. Đây là tổng durationMs từng lệnh, gồm cả lượt kiểm tra lại/exploratory và lệnh dang dở được chạy lại, có ghi trong out/v32; không phải wall time vì có lệnh chạy song song. Chi tiết từng lệnh, số lượt và định nghĩa tại [out/v32/timing.json](out/v32/timing.json). Không tính build, Vitest hoặc đối chiếu hash vào tổng durationMs.
+
+Khoảng thời gian lịch từ lệnh MC đầu tiên đến output MC cuối: **54.90 phút**, gồm cả khoảng chờ/triển khai giữa các lệnh; không phải thời gian CPU. Mốc đầu ước lượng từ birthtime summary đầu tiên trừ durationMs của lệnh đó.

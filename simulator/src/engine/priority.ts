@@ -10,7 +10,7 @@ import type {
   Decision,
 } from "./types.js";
 import { isInCooldown, isGraceBlocked, applyResetOnEffectiveChange, type CooldownKind } from "./cooldown.js";
-import { marketplaceHour, toMarketplaceDate, instant } from "../time/clock.js";
+import { calendarDaysBetween, marketplaceHour, toMarketplaceDate, instant } from "../time/clock.js";
 import { clampBid, G6_RULES } from "../guards/bid.js";
 import { immutableSnapshot, stateDiff, configHash as hashConfig, type AuditOutcome } from "../audit/log.js";
 export const CAMPAIGN = [
@@ -102,12 +102,16 @@ export function firstMatchWins(
       record(rule.id, "NOT_ELIGIBLE", ["TARGET_PAUSED"]);
       continue;
     }
-    if (rule.schedule === "every3Days" && !scheduled(campaignId ?? objectRef.id, ctx)) {
+    if (rule.schedule === "every3Days" && !(rule.id === "R08" && ctx.config.v32.r08Daily) && !scheduled(campaignId ?? objectRef.id, ctx)) {
       record(rule.id, "NOT_SCHEDULED"); continue;
     }
     if (memory && rule.blockedByTag.includes(memory.tag)) {
       record(rule.id, "BLOCKED_BY_TAG");
       continue;
+    }
+    if(rule.id==='R06'&&campaignId&&ctx.config.v32.postHarvestGraceDays>0&&
+       (before.negatives?.[campaignId]??[]).some(n=>n.harvestKeywordId&&n.harvestedAt&&calendarDaysBetween(toMarketplaceDate(n.harvestedAt,ctx.config.marketplace),ctx.today,ctx.config.marketplace.zone)>=0&&calendarDaysBetween(toMarketplaceDate(n.harvestedAt,ctx.config.marketplace),ctx.today,ctx.config.marketplace.zone)<ctx.config.v32.postHarvestGraceDays)){
+      record(rule.id,'BLOCKED_BY_HARVEST_GRACE');continue;
     }
     if (memory && isGraceBlocked(rule.id, memory, at)) {
       record(rule.id, "BLOCKED_BY_GRACE");

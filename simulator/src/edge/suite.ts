@@ -83,3 +83,9 @@ export function measureZeroOrderWindow(s:Scenario,d:Result['decisions'][number],
  const cid=d.objectRef.id,at=d.runId.split('|')[0]!,today=instant(at).setZone(s.marketplace.zone).toISODate()!,w=resolveWindow({kind:'post',days:14,minRipeDays:1},today,d.before.campaignMemory[cid]!,config),p=productAt(s,d.before.campaigns[cid]!.asin,at),threshold=deriveThresholds({asin:d.before.campaigns[cid]!.asin,priceMicros:micros(Math.round(p.priceUsd*1e6)),breakEvenAcos:p.breakEvenAcos,expCvr:p.expectedCvr},config).thresholds,fs=queryFacts(facts,{asOf:at,entityRef:cid,from:w.from,to:w.to,dailyOnly:true}),windowZeroSpend=fs.filter(f=>f.orders===0).reduce((a,f)=>a+f.spendMicros/1e6,0);
  return {date:today,Spend_zero:threshold.Spend_zero/1e6,windowZeroSpend,spendZero:windowZeroSpend};
 }
+
+/** A missing ALERT is not evidence that phases agree on an ALERT date. */
+export function synchronizedAlerts(phases:readonly (readonly {ruleId:string;day:number}[])[]):boolean {
+ const days=phases.map(events=>events.find(e=>e.ruleId==='R08')?.day);
+ return days.length===3&&days.every(day=>day!==undefined)&&new Set(days).size===1;
+}

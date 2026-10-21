@@ -12,6 +12,7 @@ export type AuditOutcome =
   | "BLOCKED_BY_TAG"
   | "BLOCKED_BY_COOLDOWN"
   | "BLOCKED_BY_GRACE"
+  | "BLOCKED_BY_HARVEST_GRACE"
   | "ERROR";
 export interface AuditEvent {
   readonly runId: string;
@@ -73,4 +74,6 @@ export function compactDecision(d: import('../engine/types.js').Decision) {
   return {...metadata, ...stateDiff(before, after)};
 }
 
-export function configHash(config: import("../../config/defaults.js").SimConfig): string { return createHash("sha256").update(JSON.stringify(config)).digest("hex"); }
+export function configHash(config: import("../../config/defaults.js").SimConfig): string { const {v32,v32Hysteresis,...legacy}=config;
+ const inactive=v32.zeroOrderLagDays===2&&!v32.r06CalendarGuard&&!v32.r08Daily&&v32.postHarvestGraceDays===0&&!v32.hysteresis&&!v32.hourlyExcludeCapped;
+ return createHash("sha256").update(JSON.stringify(inactive?legacy:config)).digest("hex"); }
