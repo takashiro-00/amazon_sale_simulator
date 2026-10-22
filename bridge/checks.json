@@ -1,0 +1,4 @@
+{
+  "bridge-tests": { "cwd": "bridge", "argv": ["/usr/local/bin/node", "--test", "test/*.test.js"], "timeout_seconds": 90, "description": "Bridge self-tests" },
+  "project-tests": { "cwd": ".", "argv": ["/usr/local/bin/node", "--test", "test/**/*.test.js"], "timeout_seconds": 90, "description": "Project tests under test/" }
+}
