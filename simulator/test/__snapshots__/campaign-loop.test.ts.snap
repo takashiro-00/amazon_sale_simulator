@@ -1,0 +1,278 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`B3 deteriorates then recovers and restores bids 1`] = `
+[
+  [
+    21,
+    "R07",
+    8,
+    "MANAGE",
+    0.9,
+  ],
+  [
+    33,
+    "R09",
+    12,
+    "NORMAL",
+    0.9,
+  ],
+  [
+    36,
+    "R09",
+    12,
+    "NORMAL",
+    0.9900000000000001,
+  ],
+  [
+    39,
+    "R09",
+    12,
+    "NORMAL",
+    1,
+  ],
+]
+`;
+
+exports[`B4 ALERT then permanent pause 1`] = `
+[
+  [
+    0,
+    "R01",
+    5,
+    "NORMAL",
+  ],
+  [
+    4,
+    "R02",
+    8,
+    "NORMAL",
+  ],
+  [
+    8,
+    "R03",
+    10,
+    "NORMAL",
+  ],
+  [
+    12,
+    "R04",
+    12,
+    "NORMAL",
+  ],
+  [
+    18,
+    "R08",
+    5,
+    "ALERT",
+  ],
+  [
+    24,
+    "R06",
+    5,
+    "PAUSED_AUTO",
+  ],
+]
+`;
+
+exports[`B4 recovery removes ALERT 1`] = `
+[
+  [
+    0,
+    "R01",
+    5,
+    "NORMAL",
+  ],
+  [
+    4,
+    "R02",
+    8,
+    "NORMAL",
+  ],
+  [
+    8,
+    "R03",
+    10,
+    "NORMAL",
+  ],
+  [
+    12,
+    "R04",
+    12,
+    "NORMAL",
+  ],
+  [
+    18,
+    "R08",
+    5,
+    "ALERT",
+  ],
+  [
+    27,
+    "R09",
+    12,
+    "NORMAL",
+  ],
+  [
+    35,
+    "R04B",
+    14.4,
+    "NORMAL",
+  ],
+]
+`;
+
+exports[`B5 R06B recovery=false 1`] = `
+[
+  [
+    0,
+    "R01",
+    5,
+    "NORMAL",
+  ],
+  [
+    6,
+    "R06B",
+    5,
+    "MANAGE",
+  ],
+  [
+    14,
+    "R06B",
+    5,
+    "PAUSED_AUTO",
+  ],
+]
+`;
+
+exports[`B5 R06B recovery=true 1`] = `
+[
+  [
+    0,
+    "R01",
+    5,
+    "NORMAL",
+  ],
+  [
+    6,
+    "R06B",
+    5,
+    "MANAGE",
+  ],
+  [
+    14,
+    "R06B",
+    5,
+    "MANAGE",
+  ],
+  [
+    18,
+    "R09",
+    5,
+    "NORMAL",
+  ],
+  [
+    19,
+    "R02",
+    8,
+    "NORMAL",
+  ],
+  [
+    21,
+    "R09",
+    8,
+    "NORMAL",
+  ],
+  [
+    23,
+    "R03",
+    10,
+    "NORMAL",
+  ],
+  [
+    24,
+    "R09",
+    10,
+    "NORMAL",
+  ],
+  [
+    27,
+    "R09",
+    10,
+    "NORMAL",
+  ],
+  [
+    28,
+    "R04",
+    12,
+    "NORMAL",
+  ],
+]
+`;
+
+exports[`edge B1 records schedule phases without assuming equal outcomes 1`] = `
+[
+  {
+    "events": [
+      [
+        18,
+        "R08",
+        5,
+        "ALERT",
+      ],
+      [
+        24,
+        "R06",
+        5,
+        "PAUSED_AUTO",
+      ],
+    ],
+    "phase": 0,
+  },
+  {
+    "events": [
+      [
+        18,
+        "R05",
+        5,
+        "NORMAL",
+      ],
+      [
+        22,
+        "R08",
+        5,
+        "ALERT",
+      ],
+      [
+        24,
+        "R06",
+        5,
+        "PAUSED_AUTO",
+      ],
+    ],
+    "phase": 1,
+  },
+  {
+    "events": [
+      [
+        18,
+        "R05",
+        5,
+        "NORMAL",
+      ],
+      [
+        23,
+        "R08",
+        5,
+        "ALERT",
+      ],
+      [
+        24,
+        "R06",
+        5,
+        "PAUSED_AUTO",
+      ],
+    ],
+    "phase": 2,
+  },
+]
+`;

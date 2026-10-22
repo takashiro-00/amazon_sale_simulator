@@ -1,0 +1,14 @@
+import { it,expect } from 'vitest';
+import { fixture } from './step4-fixture.js';
+import { firstMatchWins } from '../src/engine/priority.js';
+import { registry } from '../src/rules/registry.js';
+import { usd } from '../src/domain/money.js';
+import type { RuleId,RuleContext,ObjectRef } from '../src/engine/types.js';
+import { FactIndex } from '../src/data/facts.js';
+import { MetricsReader } from '../src/data/metrics.js';
+const evaluate=(id:RuleId,c:RuleContext,ref?:ObjectRef)=>firstMatchWins(ref??{group:registry.find(r=>r.id===id)!.group,id:['R18','R19'].includes(id)?'c':'t'},[registry.find(r=>r.id===id)!],c);
+it.each(['R10','R11','R12','R14','R18','R19'] as const)('%s is blocked by its own configured cooldown',id=>{const c=fixture();const state={...c.state,targets:{t:{...c.state.targets.t!,bidCooldownUntil:'2026-10-20'}},campaignMemory:{c:{...c.state.campaignMemory.c!,cooldownUntil:{budget:null,placement:'2026-10-20'}}}};expect(evaluate(id,{...c,state})).toBeNull();expect(c.audit.events.at(-1)?.outcome).toBe('BLOCKED_BY_COOLDOWN');});
+it.each(['R10','R14','R18','R21'] as const)('%s blocked by MANAGE and ALERT',id=>{for(const tag of ['MANAGE','ALERT'] as const){const c=fixture();evaluate(id,{...c,state:{...c.state,campaignMemory:{c:{...c.state.campaignMemory.c!,tag}}}});expect(c.audit.events.at(-1)?.outcome).toBe('BLOCKED_BY_TAG');}});
+it.each(['R10','R11','R12','R13','R14','R18','R19','R20','R21'] as const)('%s ignores a paused campaign',id=>{const c=fixture();expect(evaluate(id,{...c,state:{...c.state,campaigns:{c:{...c.state.campaigns.c!,status:'PAUSED'}}}})).toBeNull();});
+it('R11 handles positive orders with zero-dollar sales as infinite ACoS',()=>{const c=fixture();const fs=c.metrics.facts('c','2026-10-01','2026-10-17').map(f=>({...f,entityRef:'t',orders:1,clicks:5,salesMicros:usd('0')}));expect(evaluate('R11',{...c,metrics:new MetricsReader(new FactIndex(fs),c.clock.now(),c.config)})?.after.targets.t?.baseBidMicros).toBe(usd('.80'));});
+it.each(['R10','R12'] as const)('%s explicit bid boundary is a no-op',id=>{const c=fixture();const fs=c.metrics.facts('c','2026-10-01','2026-10-17').map(f=>({...f,entityRef:'t',orders:id==='R10'?3:0,clicks:20,spendMicros:usd('1'),salesMicros:usd(id==='R10'?'100':'0')}));const m=c.state.targets.t!;const state={...c.state,targets:{t:{...m,baseBidMicros:usd(id==='R10'?'1.08':'.50')}}};expect(evaluate(id,{...c,state,metrics:new MetricsReader(new FactIndex(fs),c.clock.now(),c.config)})).toBeNull();});

@@ -1,0 +1,6 @@
+{
+  "id": "A1",
+  "type": "MEASURE",
+  "scenario": "attribution-storm-account.json",
+  "runner": "src/edge/suite.ts"
+}

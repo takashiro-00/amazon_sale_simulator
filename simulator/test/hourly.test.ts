@@ -1,0 +1,28 @@
+import { it,expect } from 'vitest';
+import { fixture } from './step4-fixture.js';
+import { FactIndex } from '../src/data/facts.js';
+import { MetricsReader } from '../src/data/metrics.js';
+import { analyzeHours, outboundBid, submitBoundary } from '../src/rules/hourly/analysis.js';
+import { InMemoryFakePort } from '../src/api/port.js';
+import { FaultyFakePort } from '../src/api/faultyPort.js';
+import { usd } from '../src/domain/money.js';
+import type { Hour } from '../src/domain/entities.js';
+it('weekly campaign scope analyzes each hour: R20 then R21, neutral elsewhere',()=>{
+ const c=fixture();const fs=c.metrics.facts('c','2026-10-01','2026-10-17');const f=fs[0]!;const facts=[...fs,{...f,hour:0 as Hour,hourBucket:'2026-10-17T07:00:00.000Z',clicks:40,orders:0},{...f,hour:1 as Hour,hourBucket:'2026-10-17T08:00:00.000Z',clicks:40,orders:20}];
+ const s=analyzeHours({...c,metrics:new MetricsReader(new FactIndex(facts),c.clock.now(),c.config)});
+ expect(s.targets.t?.hourlyFactor[0]).toBe(.7);expect(s.targets.t?.hourlyFactor[1]).toBe(1.08);expect(s.targets.t?.hourlyFactor[2]).toBe(1);expect(s.targets.t?.windowStartAt).toBe(c.state.targets.t?.windowStartAt);
+});
+it('outbound safety handles stacked reductions, price drop, ToS and tag boost suppression',()=>{const c=fixture(),m=c.state.targets.t!,t=c.thresholds.t!;
+ expect(outboundBid({...m,baseBidMicros:usd('.20'),hourlyFactor:{...m.hourlyFactor,0:.7}},0,t,0,'NORMAL')).toBe(usd('.20'));
+ expect(outboundBid({...m,hourlyFactor:{...m.hourlyFactor,0:1.15}},0,t,100,'NORMAL')).toBeLessThanOrEqual(usd('.81'));
+ expect(outboundBid({...m,hourlyFactor:{...m.hourlyFactor,0:1.15}},0,t,0,'MANAGE')).toBe(usd('1'));
+});
+it('R21B batches per endpoint, skips unchanged and paused, handles both DST instants',async()=>{const c=fixture();const port=new FaultyFakePort(new InMemoryFakePort(),c.clock,1);const sent=new Map<string,number>([['t',usd('1')]]);const done=new Set<string>();const m=c.state.targets.t!;const state={...c.state,targets:{t:{...m,hourlyFactor:{...m.hourlyFactor,1:.7,2:1}}}};
+ await submitBoundary('2026-11-01T08:00Z',state,c.thresholds,port,sent,done);
+ await submitBoundary('2026-11-01T08:00Z',state,c.thresholds,port,sent,done);
+ await submitBoundary('2026-11-01T09:00Z',state,c.thresholds,port,sent,done);
+ await submitBoundary('2026-11-01T10:00Z',state,c.thresholds,port,sent,done);
+ expect(done.size).toBe(3);expect(port.calls.filter(x=>x.op.startsWith('updateTargets'))).toHaveLength(2);
+});
+it('registry exposes pure hourly proposals, R21B never changes base or writes outbound entity bid',async()=>{const {registry}=await import('../src/rules/registry.js');const c=fixture();const r=registry.find(r=>r.id==='R21B')!;const p=r.evaluate({group:'HOURLY',id:'t'},{...c,submittedBids:{t:usd('.70')}});expect(p?.proposedState).toEqual(c.state);expect(p?.outboundTargets?.[0]?.bidMicros).toBe(usd('1'));});
+it('weekly analysis skips other weekdays, low samples and paused targets; target scope isolates evidence',()=>{const c=fixture(),m=c.state.targets.t!;const fs=c.metrics.facts('c','2026-10-01','2026-10-17');const f=fs[0]!;const metrics=new MetricsReader(new FactIndex([...fs,{...f,hour:0 as Hour,hourBucket:'2026-10-17T07:00:00.000Z',clicks:39,orders:0}]),c.clock.now(),c.config);expect(analyzeHours({...c,metrics}).targets.t?.hourlyFactor[0]).toBe(1);expect(analyzeHours({...c,config:{...c.config,hourlyAnalysisWeekday:2}})).toBe(c.state);expect(analyzeHours({...c,state:{...c.state,targetEntities:{t:{...c.state.targetEntities.t!,status:'PAUSED'}}}}).targets.t).toBe(m);expect(analyzeHours({...c,metrics,config:{...c.config,ambiguity:{...c.config.ambiguity,hourlyScope:'target'}}}).targets.t?.hourlyFactor[0]).toBe(1);});

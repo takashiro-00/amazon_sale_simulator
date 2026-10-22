@@ -1,0 +1,91 @@
+{
+  "seed": 1,
+  "marketplace": {
+    "id": "US",
+    "zone": "America/Los_Angeles"
+  },
+  "startDate": "2026-10-01",
+  "days": 18,
+  "products": [
+    {
+      "asin": "B001",
+      "priceUsd": 30,
+      "breakEvenAcos": 0.4,
+      "expectedCvr": 0.1
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "lag",
+      "asin": "B001",
+      "name": "lag",
+      "type": "MANUAL",
+      "budget": 5,
+      "status": "ENABLED",
+      "topOfSearchPct": 0,
+      "targets": [
+        {
+          "id": "lag-target",
+          "bid": 0.8,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "lag-target",
+          "trueCvr": 0.04,
+          "ctr": 0.08,
+          "clearingPrice": 0.35,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 1800,
+          "hourlyTrafficCurve": [
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "lag-target",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        }
+      ]
+    }
+  ],
+  "attribution": {
+    "lagDistribution": {
+      "3": 0.1,
+      "5": 0.2,
+      "7": 0.7
+    },
+    "returnLagDays": 7
+  },
+  "returnRate": 0,
+  "hourlyNoise": 0,
+  "overspendTolerance": 0,
+  "couponZeroSalesRate": 0,
+  "events": [],
+  "apiFault": {}
+}

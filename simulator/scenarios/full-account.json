@@ -1,0 +1,248 @@
+{
+  "seed": "full-account-20261020",
+  "marketplace": {
+    "id": "US",
+    "zone": "America/Los_Angeles"
+  },
+  "startDate": "2026-10-01",
+  "days": 60,
+  "products": [
+    {
+      "asin": "B001",
+      "priceUsd": 30,
+      "breakEvenAcos": 0.4,
+      "expectedCvr": 0.1
+    }
+  ],
+  "campaigns": [
+    {
+      "id": "auto",
+      "asin": "B001",
+      "name": "Discovery",
+      "type": "AUTO",
+      "budget": 5,
+      "status": "ENABLED",
+      "topOfSearchPct": 0,
+      "harvestDestinationCampaignId": "manual",
+      "targets": [
+        {
+          "id": "auto-source",
+          "bid": 0.8,
+          "status": "ENABLED",
+          "kind": "AUTO",
+          "text": "auto discovery",
+          "trueCvr": 0.25,
+          "ctr": 0.06,
+          "clearingPrice": 0.35,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 1200,
+          "hourlyTrafficCurve": [
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "portable coffee grinder",
+              "weight": 1,
+              "cvrMultiplier": 3
+            },
+            {
+              "query": "free broken grinder",
+              "weight": 1,
+              "cvrMultiplier": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "asin": "B001",
+      "name": "Exact portfolio",
+      "type": "MANUAL",
+      "budget": 5,
+      "status": "ENABLED",
+      "topOfSearchPct": 0,
+      "targets": [
+        {
+          "id": "winner",
+          "bid": 0.7,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "premium grinder",
+          "trueCvr": 0.65,
+          "ctr": 0.08,
+          "clearingPrice": 0.35,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 1800,
+          "hourlyTrafficCurve": [
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "premium grinder",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        },
+        {
+          "id": "bleeder",
+          "bid": 1,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "bleeder grinder",
+          "trueCvr": 0,
+          "ctr": 0.08,
+          "clearingPrice": 0.35,
+          "priceSpread": 0.1,
+          "baseImpressionsPerDay": 2200,
+          "hourlyTrafficCurve": [
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "bleeder grinder",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        },
+        {
+          "id": "low",
+          "bid": 0.4,
+          "status": "ENABLED",
+          "kind": "KEYWORD",
+          "text": "rare grinder",
+          "trueCvr": 0,
+          "ctr": 0,
+          "clearingPrice": 0.6,
+          "priceSpread": 0.025,
+          "baseImpressionsPerDay": 80,
+          "hourlyTrafficCurve": [
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664,
+            0.041666666666666664
+          ],
+          "topCvrMultiplier": 1,
+          "searchTerms": [
+            {
+              "query": "rare grinder",
+              "weight": 1,
+              "cvrMultiplier": 1
+            }
+          ],
+          "matchType": "EXACT"
+        }
+      ]
+    }
+  ],
+  "attribution": {
+    "lagDistribution": {
+      "0": 1
+    },
+    "returnLagDays": 7
+  },
+  "returnRate": 0,
+  "hourlyNoise": 0,
+  "overspendTolerance": 0,
+  "couponZeroSalesRate": 0,
+  "events": [],
+  "apiFault": {
+    "createSucceedsButInvisible": 60
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "ppc-rule-simulator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.build.json",
+    "sim": "npm run build && node dist/src/cli/sim.js",
+    "mc": "npm run build && node dist/src/cli/mc.js",
+    "edge": "npm run build && node dist/src/cli/edge.js",
+    "report": "npm run build && node dist/src/cli/report.js"
+  },
+  "dependencies": {
+    "luxon": "^3.7.2"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.11"
+  }
+}
